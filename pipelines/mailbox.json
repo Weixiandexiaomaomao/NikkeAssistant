@@ -1,0 +1,283 @@
+{
+  "Entry": {
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "Open",
+      "AlreadyDone",
+      "Claim",
+      "Reward"
+    ]
+  },
+  "Open": {
+    "recognition": "OCR",
+    "roi": [
+      280,
+      1180,
+      180,
+      100
+    ],
+    "threshold": 0.55,
+    "action": "Click",
+    "post_delay": 1000,
+    "timeout": 20000,
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "AlreadyDone",
+      "Claim"
+    ],
+    "max_hit": 3,
+    "target": [
+      623,
+      45
+    ],
+    "expected": [
+      "^大厅$"
+    ]
+  },
+  "Claim": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "TemplateMatch",
+        "template": "cn/mail_title.png",
+        "roi": [
+          353,
+          153,
+          69,
+          44
+        ],
+        "method": 10001,
+        "threshold": 0.96
+      },
+      {
+        "recognition": "ColorMatch",
+        "roi": [
+          411,
+          1058,
+          230,
+          55
+        ],
+        "method": 4,
+        "lower": [
+          0,
+          100,
+          180
+        ],
+        "upper": [
+          110,
+          235,
+          255
+        ],
+        "count": 350
+      }
+    ],
+    "action": "Click",
+    "target": [
+      529,
+      1085
+    ],
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "Reward",
+      "AlreadyDone"
+    ],
+    "max_hit": 2,
+    "post_delay": 1500,
+    "timeout": 20000
+  },
+  "AlreadyDone": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "TemplateMatch",
+        "template": "cn/mail_title.png",
+        "roi": [
+          353,
+          153,
+          69,
+          44
+        ],
+        "method": 10001,
+        "threshold": 0.96
+      },
+      {
+        "recognition": "TemplateMatch",
+        "template": "cn/mail_disabled.png",
+        "roi": [
+          405,
+          1051,
+          243,
+          69
+        ],
+        "method": 10001,
+        "threshold": 0.96
+      }
+    ],
+    "action": "Click",
+    "target": [
+      640,
+      173
+    ],
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "Done"
+    ],
+    "post_delay": 1200,
+    "timeout": 20000,
+    "max_hit": 2
+  },
+  "Reward": {
+    "recognition": "TemplateMatch",
+    "template": "cn/reward_dismiss.png",
+    "roi": [
+      180,
+      430,
+      360,
+      650
+    ],
+    "method": 5,
+    "threshold": 0.92,
+    "action": "Click",
+    "target": true,
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "AlreadyDone",
+      "Claim"
+    ],
+    "max_hit": 3,
+    "post_delay": 1200,
+    "timeout": 20000
+  },
+  "Done": {
+    "recognition": "OCR",
+    "roi": [
+      280,
+      1180,
+      180,
+      100
+    ],
+    "threshold": 0.55,
+    "action": "DoNothing",
+    "post_delay": 1000,
+    "timeout": 20000,
+    "next": [],
+    "max_hit": 3,
+    "expected": [
+      "^大厅$"
+    ]
+  },
+  "LevelUp": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "LEVEL.*UP"
+        ],
+        "roi": [
+          200,
+          470,
+          330,
+          160
+        ],
+        "threshold": 0.6
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "指挥官升级"
+        ],
+        "roi": [
+          260,
+          540,
+          240,
+          120
+        ],
+        "threshold": 0.6
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "点击领取奖励"
+        ],
+        "roi": [
+          150,
+          800,
+          430,
+          250
+        ],
+        "threshold": 0.6
+      }
+    ],
+    "action": "Click",
+    "target": [
+      360,
+      914
+    ],
+    "max_hit": 3,
+    "post_delay": 1500,
+    "timeout": 20000,
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "Reward",
+      "Done",
+      "Open",
+      "Claim",
+      "AlreadyDone"
+    ]
+  },
+  "PromotionClose": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "^点击.*关闭画面[。.]?$"
+        ],
+        "roi": [
+          100,
+          1100,
+          560,
+          160
+        ],
+        "threshold": 0.55
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "礼包.*购买|礼包中.*选择"
+        ],
+        "roi": [
+          0,
+          500,
+          720,
+          290
+        ],
+        "threshold": 0.55
+      }
+    ],
+    "action": "Click",
+    "target": [
+      360,
+      1186
+    ],
+    "post_delay": 1500,
+    "max_hit": 6,
+    "next": [
+      "Entry",
+      "Open",
+      "Claim",
+      "AlreadyDone",
+      "Reward",
+      "Done",
+      "LevelUp"
+    ],
+    "timeout": 20000
+  }
+}

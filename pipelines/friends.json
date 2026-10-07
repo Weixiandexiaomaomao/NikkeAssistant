@@ -1,0 +1,357 @@
+{
+  "Entry": {
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "ConfirmSocial",
+      "Open",
+      "AlreadyDone",
+      "Gift",
+      "Reward"
+    ]
+  },
+  "Open": {
+    "recognition": "OCR",
+    "roi": [
+      280,
+      1180,
+      180,
+      100
+    ],
+    "threshold": 0.55,
+    "action": "Click",
+    "post_delay": 1000,
+    "timeout": 20000,
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "ConfirmSocial",
+      "AlreadyDone",
+      "Gift"
+    ],
+    "max_hit": 3,
+    "target": [
+      657,
+      407
+    ],
+    "expected": [
+      "^大厅$"
+    ]
+  },
+  "Gift": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "TemplateMatch",
+        "template": "cn/friend_title.png",
+        "roi": [
+          351,
+          139,
+          73,
+          46
+        ],
+        "method": 10001,
+        "threshold": 0.96
+      },
+      {
+        "recognition": "ColorMatch",
+        "roi": [
+          433,
+          1066,
+          226,
+          47
+        ],
+        "method": 4,
+        "lower": [
+          0,
+          100,
+          180
+        ],
+        "upper": [
+          110,
+          235,
+          255
+        ],
+        "count": 350
+      }
+    ],
+    "action": "Click",
+    "target": [
+      550,
+      1088
+    ],
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "ConfirmSocial",
+      "Reward",
+      "AlreadyDone"
+    ],
+    "max_hit": 2,
+    "post_delay": 1500,
+    "timeout": 20000
+  },
+  "AlreadyDone": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "TemplateMatch",
+        "template": "cn/friend_title.png",
+        "roi": [
+          351,
+          139,
+          73,
+          46
+        ],
+        "method": 10001,
+        "threshold": 0.96
+      },
+      {
+        "recognition": "TemplateMatch",
+        "template": "cn/friend_disabled.png",
+        "roi": [
+          427,
+          1057,
+          242,
+          66
+        ],
+        "method": 10001,
+        "threshold": 0.96
+      }
+    ],
+    "action": "Click",
+    "target": [
+      642,
+      159
+    ],
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "Done"
+    ],
+    "post_delay": 1200,
+    "timeout": 20000,
+    "max_hit": 2
+  },
+  "Reward": {
+    "recognition": "TemplateMatch",
+    "template": "cn/reward_dismiss.png",
+    "roi": [
+      180,
+      430,
+      360,
+      650
+    ],
+    "method": 5,
+    "threshold": 0.92,
+    "action": "Click",
+    "target": true,
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "ConfirmSocial",
+      "AlreadyDone",
+      "Gift"
+    ],
+    "max_hit": 3,
+    "post_delay": 1200,
+    "timeout": 20000
+  },
+  "Done": {
+    "recognition": "OCR",
+    "roi": [
+      280,
+      1180,
+      180,
+      100
+    ],
+    "threshold": 0.55,
+    "action": "DoNothing",
+    "post_delay": 1000,
+    "timeout": 20000,
+    "next": [],
+    "max_hit": 3,
+    "expected": [
+      "^大厅$"
+    ]
+  },
+  "ConfirmSocial": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "对所有好友完成社交点数收发"
+        ],
+        "roi": [
+          180,
+          535,
+          390,
+          100
+        ],
+        "threshold": 0.6
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "^确认$"
+        ],
+        "roi": [
+          290,
+          770,
+          190,
+          80
+        ],
+        "threshold": 0.6
+      },
+      {
+        "recognition": "ColorMatch",
+        "roi": [
+          235,
+          775,
+          245,
+          45
+        ],
+        "method": 4,
+        "lower": [
+          0,
+          100,
+          180
+        ],
+        "upper": [
+          110,
+          235,
+          255
+        ],
+        "count": 350
+      }
+    ],
+    "action": "Click",
+    "target": [
+      360,
+      800
+    ],
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "ConfirmSocial",
+      "Reward",
+      "AlreadyDone",
+      "Gift"
+    ],
+    "max_hit": 3,
+    "post_delay": 1500,
+    "timeout": 20000
+  },
+  "LevelUp": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "LEVEL.*UP"
+        ],
+        "roi": [
+          200,
+          470,
+          330,
+          160
+        ],
+        "threshold": 0.6
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "指挥官升级"
+        ],
+        "roi": [
+          260,
+          540,
+          240,
+          120
+        ],
+        "threshold": 0.6
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "点击领取奖励"
+        ],
+        "roi": [
+          150,
+          800,
+          430,
+          250
+        ],
+        "threshold": 0.6
+      }
+    ],
+    "action": "Click",
+    "target": [
+      360,
+      914
+    ],
+    "max_hit": 3,
+    "post_delay": 1500,
+    "timeout": 20000,
+    "next": [
+      "PromotionClose",
+      "LevelUp",
+      "Reward",
+      "Done",
+      "Open",
+      "Gift",
+      "AlreadyDone",
+      "ConfirmSocial"
+    ]
+  },
+  "PromotionClose": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "^点击.*关闭画面[。.]?$"
+        ],
+        "roi": [
+          100,
+          1100,
+          560,
+          160
+        ],
+        "threshold": 0.55
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "礼包.*购买|礼包中.*选择"
+        ],
+        "roi": [
+          0,
+          500,
+          720,
+          290
+        ],
+        "threshold": 0.55
+      }
+    ],
+    "action": "Click",
+    "target": [
+      360,
+      1186
+    ],
+    "post_delay": 1500,
+    "max_hit": 6,
+    "next": [
+      "Entry",
+      "Open",
+      "Gift",
+      "AlreadyDone",
+      "Reward",
+      "Done",
+      "ConfirmSocial",
+      "LevelUp"
+    ],
+    "timeout": 20000
+  }
+}
