@@ -1,0 +1,19 @@
+Third-party components used by NikkeAssistant
+
+MaaFramework 5.14.2 (LGPL-3.0): https://github.com/MaaXYZ/MaaFramework
+Source for this version: https://github.com/MaaXYZ/MaaFramework/releases/tag/v5.14.2
+MaaFramework runtime DLLs are external in _internal/maa/bin.
+Python 3.10: https://www.python.org/
+NumPy 2.2.6: https://github.com/numpy/numpy/tree/v2.2.6
+Pillow 12.3.0: https://github.com/python-pillow/Pillow
+CustomTkinter 5.2.2 (MIT): https://github.com/TomSchimansky/CustomTkinter
+Darkdetect 0.8.0 (BSD): https://github.com/albertosottile/darkdetect
+Tcl/Tk runtime: https://www.tcl.tk/
+PyInstaller bootloader: https://github.com/pyinstaller/pyinstaller (GPL with bootloader exception).
+Native dependencies bundled by MaaFramework include OpenCV, ONNX Runtime,
+FastDeploy/PPOCR, DirectML, and ViGEmClient. See MaaFramework upstream
+source and dependency build scripts for notices and source references.
+
+The application source and build instructions are in source/.
+MaaAgentBinary, game accounts, login information, logs and screenshots
+are not included in this archive.

@@ -1,0 +1,4 @@
+PP-OCRv4 detection and Chinese recognition models (Apache-2.0).
+Source: https://github.com/PaddlePaddle/PaddleOCR
+Model distribution: rapidocr_onnxruntime 1.4.4, https://github.com/RapidAI/RapidOCR
+Models and character dictionary are stored in resource/model/ocr.
