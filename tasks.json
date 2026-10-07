@@ -1,0 +1,220 @@
+[
+  {
+    "id": "cn_start_game",
+    "name": "启动游戏",
+    "handler": "start_game",
+    "status": "模拟器桌面启动、维护公告、点击开始、活动公告、大厅已实测",
+    "default": true,
+    "package": "com.tencent.nikke",
+    "description": "自动定位所选模拟器中的国服游戏安装入口并启动。识别点击开始、处理已知公告和签到弹窗，确认大厅后才运行后续任务；游戏已在运行时回到大厅。账号需要登录时停止并提示。"
+  },
+  {
+    "id": "cn_mailbox",
+    "name": "邮箱领取",
+    "pipeline": "pipelines/mailbox.json",
+    "entry": "Entry",
+    "aspect": 0.5625,
+    "package": "com.tencent.nikke",
+    "total_timeout": 150,
+    "labels": {
+      "Open": "打开邮箱",
+      "Claim": "领取全部邮件奖励",
+      "AlreadyDone": "邮箱无可领奖励，返回大厅",
+      "Reward": "关闭奖励弹窗",
+      "Done": "已确认大厅",
+      "LevelUp": "关闭指挥官升级奖励弹窗"
+    },
+    "status": "已实测",
+    "default": true
+  },
+  {
+    "id": "cn_friends",
+    "name": "好友点赠送 / 已领检查",
+    "pipeline": "pipelines/friends.json",
+    "entry": "Entry",
+    "aspect": 0.5625,
+    "package": "com.tencent.nikke",
+    "total_timeout": 150,
+    "labels": {
+      "Open": "打开好友列表",
+      "Gift": "赠送好友点",
+      "AlreadyDone": "今日赠送已完成，返回大厅",
+      "Reward": "关闭奖励弹窗",
+      "Done": "已确认大厅",
+      "ConfirmSocial": "确认好友点收发完成通知",
+      "LevelUp": "关闭指挥官升级奖励弹窗"
+    },
+    "status": "已实测",
+    "default": true
+  },
+  {
+    "id": "cn_defense",
+    "name": "前哨基地收菜",
+    "pipeline": "pipelines/defense.json",
+    "entry": "Entry",
+    "aspect": 0.5625,
+    "package": "com.tencent.nikke",
+    "total_timeout": 150,
+    "labels": {
+      "Open": "打开防御前哨基地",
+      "Collect": "领取累积奖励",
+      "Reward": "关闭奖励弹窗",
+      "Empty": "当前没有奖励，返回大厅",
+      "CloseAfterReward": "领取后返回大厅",
+      "Done": "已确认大厅",
+      "LevelUp": "关闭指挥官升级奖励弹窗"
+    },
+    "status": "已实测",
+    "default": true
+  },
+  {
+    "id": "cn_dispatch",
+    "name": "派遣领取 / 一键派遣",
+    "handler": "dispatch",
+    "status": "领取已实测",
+    "default": true,
+    "description": "领取完成的派遣并调用游戏全部派遣，不重置目录。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_wipe",
+    "name": "每日免费歼灭",
+    "handler": "wipe",
+    "status": "付费跳过已实测",
+    "default": true,
+    "description": "仅当按钮当前价格为 0 或免费时执行；不会消耗钻石。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_shop",
+    "name": "普通商店 免费购买与刷新",
+    "handler": "shop",
+    "status": "已领分支实测",
+    "default": true,
+    "description": "先购买第一格零价商品，售罄后使用一次免费刷新，再购买刷新出的零价商品。确认页核实消耗为0；不执行付费刷新或购买。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_shop_packs",
+    "name": "付费商店 免费礼包",
+    "handler": "shop_packs",
+    "status": "已实测",
+    "default": true,
+    "description": "领取每日、每周、每月免费礼包及 STEP UP 当前已解锁的免费阶段；检查剩余次数变为0后返回大厅。不会购买付费礼包或解锁付费前置阶段。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_simulation",
+    "name": "模拟室快速模拟",
+    "handler": "simulation",
+    "status": "完成分支实测",
+    "default": false,
+    "description": "沿用上次选择的难度，快速模拟并跳过增益选择，最后节点使用当前队伍自动战斗；领取奖励才确认成功。请开启自动射击与自动爆裂。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_interception",
+    "name": "拦截战 · 快速优先",
+    "handler": "interception",
+    "status": "实际战斗后两次快速战斗、次数减少已实测",
+    "default": false,
+    "description": "优先快速战斗；不可用时沿用当前队伍进入实际战斗。最多三次，关闭结算后检查剩余次数减少，次数用完结束。不购买次数，请开启自动射击和自动爆裂。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_tower",
+    "name": "当天开放企业塔",
+    "handler": "tower",
+    "status": "实验功能",
+    "default": false,
+    "description": "最多三层，剩余次数为零跳过；战斗失败结束，不爬普通无限塔。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_rookie",
+    "name": "新人竞技场免费挑战",
+    "handler": "rookie",
+    "status": "实验功能",
+    "default": false,
+    "description": "最多五次，按设置选择第1、2或3个对手（默认第三个），仅免费挑战，沿用当前队伍。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_arena_reward",
+    "name": "特殊竞技场奖励",
+    "handler": "arena_reward",
+    "status": "已实测",
+    "default": true,
+    "description": "打开累积奖励面板领取竞技场货币，不挑战特殊竞技场。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_advise",
+    "name": "咨询 批量咨询与花絮",
+    "handler": "advise",
+    "status": "批量咨询与花絮奖励已实测",
+    "default": false,
+    "description": "沿用游戏批量咨询名单，核实次数减少后检查角色列表红点，进入已解锁花絮章节并跳过剧情领取奖励；咨询次数用完仍检查花絮。完成后返回大厅，不送礼、不购买次数、不进入锁定章节。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "event_daily",
+    "name": "活动日常 · 签到与关卡",
+    "handler": "event_daily",
+    "status": "页面和操作已实测，整队列待验证",
+    "default": false,
+    "description": "UNBREAKABLE SPHERE：从大厅识别横幅进入，或从活动首页启动。可与普通日常一起勾选，共用活动页设置。领取签到，STORY 已通关关卡快速战斗或首次推图，打可用挑战，最后领取活动任务。使用已有门票，不购买次数。STORY II 开放后优先推进未通关新关卡，再按设置刷取日常关卡。使用现有门票，实际首次推图仍需实机验证。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "event_wisdom_daily",
+    "name": "WISDOM SPRING 活动日常",
+    "handler": "event_wisdom_daily",
+    "status": "困难1-11、挑战快速战斗、任务状态已实测",
+    "default": false,
+    "description": "ENTER关卡快速战斗、挑战、最后领取活动任务；沿用当前队伍与已选难度，只使用现有门票。首页无签到入口时跳过。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "event_continue",
+    "name": "活动推图 · 从当前关卡继续",
+    "handler": "event_push",
+    "status": "待国服实测",
+    "default": false,
+    "description": "手动进入任一活动并选择首关，从准备页或战后下一关页面开始。连续开战、战后下一关、可选跳过剧情；失败、锁定、门票不足停止。大厅入口和活动地图自动选关尚未适配。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_recruit_free",
+    "name": "每日免费单次招募",
+    "handler": "recruit_free",
+    "status": "免费抽取、结果确认、已用跳过及返回已实测",
+    "default": true,
+    "description": "识别每日免费一次入口，仅招募1名，处理结果后返回大厅。免费次数已用完时跳过，不花钻石或招募券。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_missions",
+    "name": "领取任务与 PASS 奖励",
+    "handler": "missions",
+    "status": "普通任务 / 三页 PASS 领取与返回大厅已实测",
+    "default": true,
+    "description": "全部日常和活动流程结束后，最后领取每日、每周、主线、成就及 MISSION PASS 任务点数和已解锁奖励，灰色按钮自动跳过，完成后返回大厅。不购买 PASS。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  }
+]

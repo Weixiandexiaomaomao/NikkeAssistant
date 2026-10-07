@@ -1,3 +1,5 @@
+妮姬国服助手 v0.3.37 · Windows 64 位便携测试版
+
 # 妮姬国服助手 · NikkeAssistant
 
 基于 MaaFramework 的 Windows 日常自动化工具，面向雷电模拟器中的《胜利女神：新的希望》国服。
