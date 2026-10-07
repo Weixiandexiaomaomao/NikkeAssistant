@@ -1,0 +1,134 @@
+{
+  "lobby": {
+    "recognition": "TemplateMatch",
+    "template": "cn/lobby.png",
+    "roi": [
+      313,
+      1218,
+      91,
+      45
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "mail_title": {
+    "recognition": "TemplateMatch",
+    "template": "cn/mail_title.png",
+    "roi": [
+      353,
+      153,
+      69,
+      44
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "mail_disabled": {
+    "recognition": "TemplateMatch",
+    "template": "cn/mail_disabled.png",
+    "roi": [
+      405,
+      1051,
+      243,
+      69
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "friend_title": {
+    "recognition": "TemplateMatch",
+    "template": "cn/friend_title.png",
+    "roi": [
+      351,
+      139,
+      73,
+      46
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "friend_disabled": {
+    "recognition": "TemplateMatch",
+    "template": "cn/friend_disabled.png",
+    "roi": [
+      427,
+      1057,
+      242,
+      66
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "defense_title": {
+    "recognition": "TemplateMatch",
+    "template": "cn/defense_title.png",
+    "roi": [
+      87,
+      139,
+      254,
+      58
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "defense_collect": {
+    "recognition": "TemplateMatch",
+    "template": "cn/defense_collect.png",
+    "roi": [
+      371,
+      1057,
+      266,
+      71
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "defense_empty": {
+    "recognition": "TemplateMatch",
+    "template": "cn/defense_empty.png",
+    "roi": [
+      251,
+      859,
+      220,
+      39
+    ],
+    "method": 5,
+    "threshold": 0.92
+  },
+  "reward_dismiss": {
+    "recognition": "TemplateMatch",
+    "template": "cn/reward_dismiss.png",
+    "roi": [
+      287,
+      862,
+      148,
+      39
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "mission_title": {
+    "recognition": "TemplateMatch",
+    "template": "cn/mission_title.png",
+    "roi": [
+      315,
+      115,
+      91,
+      52
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  },
+  "daily_done": {
+    "recognition": "TemplateMatch",
+    "template": "cn/daily_done.png",
+    "roi": [
+      274,
+      707,
+      169,
+      41
+    ],
+    "method": 10001,
+    "threshold": 0.96
+  }
+}
