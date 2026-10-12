@@ -1,0 +1,130 @@
+{
+  "CommonRewardDismiss": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "^奖励$"
+        ],
+        "roi": [
+          120,
+          240,
+          480,
+          430
+        ],
+        "threshold": 0.55
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "^点击领取奖励[。.]?$"
+        ],
+        "roi": [
+          100,
+          650,
+          520,
+          510
+        ],
+        "threshold": 0.55
+      }
+    ],
+    "box_index": 1,
+    "action": "Click",
+    "target": true,
+    "post_delay": 1500,
+    "max_hit": 8,
+    "next": []
+  },
+  "CommonAnnouncementDismiss": {
+    "action": "Click",
+    "post_delay": 1500,
+    "all_of": [
+      {
+        "expected": [
+          "^公告$"
+        ],
+        "roi": [
+          250,
+          75,
+          250,
+          120
+        ],
+        "threshold": 0.55,
+        "recognition": "OCR"
+      },
+      {
+        "expected": [
+          "^活动公告$"
+        ],
+        "roi": [
+          50,
+          155,
+          270,
+          110
+        ],
+        "threshold": 0.55,
+        "recognition": "OCR"
+      },
+      {
+        "expected": [
+          "^系统公告$"
+        ],
+        "roi": [
+          375,
+          155,
+          300,
+          110
+        ],
+        "threshold": 0.55,
+        "recognition": "OCR"
+      }
+    ],
+    "next": [],
+    "target": [
+      650,
+      130
+    ],
+    "max_hit": 8,
+    "recognition": "And"
+  },
+  "CommonSocialNoticeDismiss": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "^通知$"
+        ],
+        "roi": [
+          250,
+          300,
+          250,
+          150
+        ],
+        "threshold": 0.55
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "对所有好友完成社交点数收发"
+        ],
+        "roi": [
+          100,
+          480,
+          520,
+          160
+        ],
+        "threshold": 0.55
+      }
+    ],
+    "action": "Click",
+    "target": [
+      640,
+      375
+    ],
+    "post_delay": 1500,
+    "max_hit": 8,
+    "next": []
+  }
+}
