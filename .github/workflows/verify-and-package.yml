@@ -1,0 +1,42 @@
+name: Verify and package Windows build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pyinstaller==6.22.2
+      - name: Run regression tests
+        run: python -m unittest discover -s tests -q
+      - name: Build executable
+        run: python -m PyInstaller --noconfirm --onedir --windowed --name NikkeAssistant --collect-all maa --collect-all customtkinter --exclude-module cv2 --exclude-module pytest app.py
+      - name: Package portable build
+        run: python package_release.py
+      - name: Check packaged executable
+        shell: pwsh
+        run: |
+          $releaseFolder = Get-ChildItem release -Directory | Select-Object -First 1
+          $selfTestPath = Join-Path $env:RUNNER_TEMP 'nikke-selftest.json'
+          $program = Start-Process -FilePath (Join-Path $releaseFolder.FullName 'NikkeAssistant.exe') -ArgumentList '--self-test', $selfTestPath -WindowStyle Hidden -PassThru
+          if (-not $program.WaitForExit(60000)) { throw 'Executable self-test timed out' }
+          $result = Get-Content -LiteralPath $selfTestPath -Raw | ConvertFrom-Json
+          if (-not $result.passed) { throw 'Executable self-test failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NikkeAssistant-Windows
+          path: |
+            release/*.zip
+            release/*.sha256
+          if-no-files-found: error
