@@ -1,14 +1,15 @@
 {
   "Entry": {
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "ConfirmSocial",
       "Open",
       "AlreadyDone",
-      "Gift",
-      "Reward"
-    ]
+      "Gift"
+    ],
+    "timeout": 60000
   },
   "Open": {
     "recognition": "OCR",
@@ -21,8 +22,9 @@
     "threshold": 0.55,
     "action": "Click",
     "post_delay": 1000,
-    "timeout": 20000,
+    "timeout": 60000,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "ConfirmSocial",
@@ -42,16 +44,17 @@
     "recognition": "And",
     "all_of": [
       {
-        "recognition": "TemplateMatch",
-        "template": "cn/friend_title.png",
-        "roi": [
-          351,
-          139,
-          73,
-          46
+        "recognition": "OCR",
+        "expected": [
+          "^好友$"
         ],
-        "method": 10001,
-        "threshold": 0.96
+        "roi": [
+          300,
+          110,
+          170,
+          100
+        ],
+        "threshold": 0.55
       },
       {
         "recognition": "ColorMatch",
@@ -81,42 +84,44 @@
       1088
     ],
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "ConfirmSocial",
-      "Reward",
       "AlreadyDone"
     ],
     "max_hit": 2,
     "post_delay": 1500,
-    "timeout": 20000
+    "timeout": 60000
   },
   "AlreadyDone": {
     "recognition": "And",
     "all_of": [
       {
-        "recognition": "TemplateMatch",
-        "template": "cn/friend_title.png",
-        "roi": [
-          351,
-          139,
-          73,
-          46
+        "recognition": "OCR",
+        "expected": [
+          "^好友$"
         ],
-        "method": 10001,
-        "threshold": 0.96
+        "roi": [
+          300,
+          110,
+          170,
+          100
+        ],
+        "threshold": 0.55
       },
       {
-        "recognition": "TemplateMatch",
-        "template": "cn/friend_disabled.png",
-        "roi": [
-          427,
-          1057,
-          242,
-          66
+        "recognition": "OCR",
+        "expected": [
+          "每日发送上限.*0[ /／]*30"
         ],
-        "method": 10001,
-        "threshold": 0.96
+        "roi": [
+          430,
+          1000,
+          280,
+          70
+        ],
+        "threshold": 0.55
       }
     ],
     "action": "Click",
@@ -125,37 +130,14 @@
       159
     ],
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "Done"
     ],
     "post_delay": 1200,
-    "timeout": 20000,
+    "timeout": 60000,
     "max_hit": 2
-  },
-  "Reward": {
-    "recognition": "TemplateMatch",
-    "template": "cn/reward_dismiss.png",
-    "roi": [
-      180,
-      430,
-      360,
-      650
-    ],
-    "method": 5,
-    "threshold": 0.92,
-    "action": "Click",
-    "target": true,
-    "next": [
-      "PromotionClose",
-      "LevelUp",
-      "ConfirmSocial",
-      "AlreadyDone",
-      "Gift"
-    ],
-    "max_hit": 3,
-    "post_delay": 1200,
-    "timeout": 20000
   },
   "Done": {
     "recognition": "OCR",
@@ -181,67 +163,46 @@
       {
         "recognition": "OCR",
         "expected": [
-          "对所有好友完成社交点数收发"
+          "^通知$"
         ],
         "roi": [
-          180,
-          535,
-          390,
-          100
+          250,
+          300,
+          250,
+          150
         ],
-        "threshold": 0.6
+        "threshold": 0.55
       },
       {
         "recognition": "OCR",
         "expected": [
-          "^确认$"
+          "对所有好友完成社交点数收发"
         ],
         "roi": [
-          290,
-          770,
-          190,
-          80
-        ],
-        "threshold": 0.6
-      },
-      {
-        "recognition": "ColorMatch",
-        "roi": [
-          235,
-          775,
-          245,
-          45
-        ],
-        "method": 4,
-        "lower": [
-          0,
           100,
-          180
+          480,
+          520,
+          160
         ],
-        "upper": [
-          110,
-          235,
-          255
-        ],
-        "count": 350
+        "threshold": 0.55
       }
     ],
     "action": "Click",
     "target": [
-      360,
-      800
+      640,
+      375
     ],
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "ConfirmSocial",
-      "Reward",
       "AlreadyDone",
       "Gift"
     ],
     "max_hit": 3,
     "post_delay": 1500,
-    "timeout": 20000
+    "timeout": 60000
   },
   "LevelUp": {
     "recognition": "And",
@@ -293,11 +254,11 @@
     ],
     "max_hit": 3,
     "post_delay": 1500,
-    "timeout": 20000,
+    "timeout": 60000,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
-      "Reward",
       "Done",
       "Open",
       "Gift",
@@ -343,15 +304,15 @@
     "post_delay": 1500,
     "max_hit": 6,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "Entry",
       "Open",
       "Gift",
       "AlreadyDone",
-      "Reward",
       "Done",
       "ConfirmSocial",
       "LevelUp"
     ],
-    "timeout": 20000
+    "timeout": 60000
   }
 }

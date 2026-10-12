@@ -1,12 +1,12 @@
 {
   "Entry": {
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
-      "Open",
       "Empty",
       "Collect",
-      "Reward"
+      "Open"
     ]
   },
   "Open": {
@@ -22,10 +22,12 @@
     "post_delay": 1000,
     "timeout": 20000,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "Empty",
-      "Collect"
+      "Collect",
+      "CloseAfterReward"
     ],
     "max_hit": 3,
     "target": [
@@ -48,53 +50,52 @@
     "method": 10001,
     "threshold": 0.96,
     "action": "Click",
-    "post_delay": 1000,
+    "post_delay": 3000,
     "timeout": 20000,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
-      "Reward",
-      "Empty"
+      "Empty",
+      "CloseAfterReward"
     ],
     "max_hit": 3
   },
-  "Reward": {
-    "recognition": "TemplateMatch",
-    "template": "cn/reward_dismiss.png",
-    "roi": [
-      180,
-      430,
-      360,
-      650
-    ],
-    "method": 5,
-    "threshold": 0.92,
-    "action": "Click",
-    "target": true,
-    "next": [
-      "PromotionClose",
-      "LevelUp",
-      "CloseAfterReward"
-    ],
-    "max_hit": 3,
-    "post_delay": 1200,
-    "timeout": 20000
-  },
   "CloseAfterReward": {
-    "recognition": "TemplateMatch",
-    "template": "cn/defense_title.png",
-    "roi": [
-      87,
-      139,
-      254,
-      58
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "防御前哨基地"
+        ],
+        "roi": [
+          60,
+          110,
+          440,
+          120
+        ],
+        "threshold": 0.55
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "^获得奖励$"
+        ],
+        "roi": [
+          360,
+          1040,
+          290,
+          100
+        ],
+        "threshold": 0.55
+      }
     ],
-    "method": 10001,
-    "threshold": 0.96,
     "action": "Click",
     "post_delay": 1000,
     "timeout": 20000,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "Done"
@@ -109,28 +110,30 @@
     "recognition": "And",
     "all_of": [
       {
-        "recognition": "TemplateMatch",
-        "template": "cn/defense_title.png",
-        "roi": [
-          87,
-          139,
-          254,
-          58
+        "recognition": "OCR",
+        "expected": [
+          "防御前哨基地"
         ],
-        "method": 10001,
-        "threshold": 0.96
+        "roi": [
+          60,
+          110,
+          440,
+          120
+        ],
+        "threshold": 0.55
       },
       {
-        "recognition": "TemplateMatch",
-        "template": "cn/defense_empty.png",
-        "roi": [
-          251,
-          859,
-          220,
-          39
+        "recognition": "OCR",
+        "expected": [
+          "目前没有获得的奖励"
         ],
-        "method": 5,
-        "threshold": 0.92
+        "roi": [
+          160,
+          780,
+          420,
+          180
+        ],
+        "threshold": 0.55
       }
     ],
     "action": "Click",
@@ -139,6 +142,7 @@
       156
     ],
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "Done"
@@ -215,9 +219,9 @@
     "post_delay": 1500,
     "timeout": 20000,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
-      "Reward",
       "Done",
       "Open",
       "Collect",
@@ -263,10 +267,10 @@
     "post_delay": 1500,
     "max_hit": 6,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "Entry",
       "Open",
       "Collect",
-      "Reward",
       "CloseAfterReward",
       "Empty",
       "Done",

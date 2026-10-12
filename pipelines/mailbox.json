@@ -1,12 +1,12 @@
 {
   "Entry": {
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "Open",
       "AlreadyDone",
-      "Claim",
-      "Reward"
+      "Claim"
     ]
   },
   "Open": {
@@ -22,6 +22,7 @@
     "post_delay": 1000,
     "timeout": 20000,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "AlreadyDone",
@@ -79,9 +80,9 @@
       1085
     ],
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
-      "Reward",
       "AlreadyDone"
     ],
     "max_hit": 2,
@@ -122,6 +123,7 @@
       173
     ],
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
       "Done"
@@ -129,29 +131,6 @@
     "post_delay": 1200,
     "timeout": 20000,
     "max_hit": 2
-  },
-  "Reward": {
-    "recognition": "TemplateMatch",
-    "template": "cn/reward_dismiss.png",
-    "roi": [
-      180,
-      430,
-      360,
-      650
-    ],
-    "method": 5,
-    "threshold": 0.92,
-    "action": "Click",
-    "target": true,
-    "next": [
-      "PromotionClose",
-      "LevelUp",
-      "AlreadyDone",
-      "Claim"
-    ],
-    "max_hit": 3,
-    "post_delay": 1200,
-    "timeout": 20000
   },
   "Done": {
     "recognition": "OCR",
@@ -223,9 +202,9 @@
     "post_delay": 1500,
     "timeout": 20000,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "PromotionClose",
       "LevelUp",
-      "Reward",
       "Done",
       "Open",
       "Claim",
@@ -270,11 +249,11 @@
     "post_delay": 1500,
     "max_hit": 6,
     "next": [
+      "[JumpBack]CommonRewardDismiss",
       "Entry",
       "Open",
       "Claim",
       "AlreadyDone",
-      "Reward",
       "Done",
       "LevelUp"
     ],
