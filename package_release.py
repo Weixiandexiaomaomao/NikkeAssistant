@@ -17,8 +17,7 @@ def main():
     if target.exists():
         raise RuntimeError('发行目录已存在，请指定新的版本目录，避免混入旧配置')
     shutil.copytree(ROOT / 'dist' / 'NikkeAssistant', target)
-    (target / 'resource' / 'pipeline').mkdir(parents=True)
-    (target / 'resource' / 'pipeline' / 'empty.json').write_text('{}', encoding='utf-8')
+    shutil.copytree(ROOT / 'resource' / 'pipeline', target / 'resource' / 'pipeline')
     shutil.copytree(ROOT / 'resource' / 'image' / 'cn', target / 'resource' / 'image' / 'cn')
     shutil.copytree(ROOT / 'resource' / 'model', target / 'resource' / 'model')
     (target / 'pipelines').mkdir()
@@ -31,7 +30,7 @@ def main():
     shutil.copy2(ROOT / 'VALIDATION.md', target / '验证说明.md')
     source = target / 'source'
     source.mkdir()
-    for filename in ('app.py', 'modern_ui.py', 'engine.py', 'daily.py', 'event_flow.py', 'portable.py', 'requirements.txt',
+    for filename in ('app.py', 'modern_ui.py', 'schedule_ui.py', 'daily_schedule.py', 'emulator_launch.py', 'engine.py', 'daily.py', 'event_flow.py', 'supplies_flow.py', 'common_popups.py', 'portable.py', 'requirements.txt',
                      'package_release.py', 'PORTABLE_README.txt', 'BUILD.md', 'VALIDATION.md', 'Apache-2.0.txt'):
         shutil.copy2(ROOT / filename, source / filename)
     licenses = target / 'licenses'

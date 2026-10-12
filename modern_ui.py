@@ -61,7 +61,7 @@ class ModernUI:
         self.button(rail,'▤',lambda:self._set_profile('日常长草'),width=38).pack(padx=5,pady=6)
         self.button(rail,'⊞',self.open_recorder,width=38).pack(padx=5,pady=6)
         self.button(rail,'▣',self.capture,width=38).pack(padx=5,pady=6)
-        self.button(rail,'⚙',self.connection_settings,width=38).pack(side='bottom',padx=5,pady=12)
+        self.button(rail,'⚙',lambda:self.open_settings('定时执行'),width=38).pack(side='bottom',padx=5,pady=12)
         self.label(rail,'CN',11,MUTED).pack(side='bottom',pady=6)
         shell=ctk.CTkFrame(self,fg_color='transparent'); shell.pack(side='left',fill='both',expand=True)
         tabs=ctk.CTkFrame(shell,fg_color='#E9ECF3',corner_radius=0,height=45)
@@ -139,6 +139,8 @@ class ModernUI:
         self.stop_button=self.button(footer,'■ 停止（F8）',self.engine.stop,width=116)
         self.stop_button.pack(side='right')
         self.label(footer,f'妮姬国服助手  v{VERSION}',11,MUTED).pack(side='right',padx=15)
+        self.schedule_status=self.label(footer,'定时未启用',11,MUTED)
+        self.schedule_status.pack(side='right',padx=12)
         self.render_tasks(); self.focus_task(0)
         self.after(1500,self.preview_loop)
 
@@ -147,7 +149,7 @@ class ModernUI:
             return [i for i,t in enumerate(self.tasks) if t.get('handler') in ('start_game','simulation','interception','tower','rookie','advise')]
         if self.profile.get()=='活动任务': return [i for i,t in enumerate(self.tasks) if not t.get('id','').startswith('cn_')]
         return [i for i,t in enumerate(self.tasks)
-                if not t.get('handler','').startswith('event_') or t.get('handler') in ('event_daily','event_wisdom_daily')]
+                if not t.get('handler','').startswith('event_') or t.get('handler') in ('event_daily','event_wisdom_daily','event_supplies')]
 
     def _set_profile(self,value):
         if self.busy: return
@@ -192,8 +194,9 @@ class ModernUI:
     def save_preferences(self):
         if self.busy: return
         settings={**self.load_json(ROOT/'settings.json',{}),'adb':self.adb.get(),'serial':self.serial.get(),
-                  'options':self.engine.options,'live_preview':self.live.get(),
-                  'selected':[t.get('id') for i,t in enumerate(self.tasks) if self.checked[i].get()]}
+                  'options':self.engine.options,'live_preview':self.live.get(),'emulator':self.emulator_config,
+                  'selected':[t.get('id') for i,t in enumerate(self.tasks) if self.checked[i].get()],
+                  'schedule':getattr(self,'schedule_config',self.load_json(ROOT/'settings.json',{}).get('schedule',{}))}
         (ROOT/'settings.json').write_text(json.dumps(settings,ensure_ascii=False,indent=2),encoding='utf-8')
 
     def option(self,parent,label,key,values=None,default=None):
@@ -235,6 +238,8 @@ class ModernUI:
             self.option(self.settings_body,'关卡方式',prefix+'story_mode',['快速战斗','推未通关关卡'],'快速战斗')
             self.option(self.settings_body,'快速战斗关卡',prefix+'farm_stage',['11','12'],'11')
             self.label(self.settings_body,('WISDOM SPRING：ENTER → 关卡 → 挑战 → 任务\n首页没有独立签到入口时跳过\n使用现有门票，不购买次数' if kind=='event_wisdom_daily' else '从大厅或 UNBREAKABLE SPHERE 活动首页开始\n签到 → STORY → 挑战 → 活动任务\n日常与活动页共用勾选和设置\n使用已有门票，沿用当前队伍\n未开放章节跳过；自动战斗需在游戏开启\nSTORY II 开放后优先推进新关卡；无新关卡时按设置刷取'),12,MUTED,justify='left',wraplength=280).pack(anchor='w',pady=14)
+        elif kind == 'event_supplies':
+            self.label(self.settings_body,'任务物资 → 批量获取奖励\n获得 A 型物资 → 开启下一箱\n领取完成奖励后继续获取\n仅使用现有物资，用完后返回大厅\n每次核对箱号和物资数量变化',12,MUTED,justify='left',wraplength=280).pack(anchor='w',pady=18)
         elif kind == 'event_push':
             self.option(self.settings_body,'最多开始关卡数','event_push_count',[1,3,5,12,24],12)
             self.option(self.settings_body,'跳过剧情','event_skip_story',['否','是'],'否')
@@ -293,15 +298,7 @@ class ModernUI:
         self.logs.configure(state='normal'); self.logs.delete('1.0','end'); self.logs.configure(state='disabled')
 
     def connection_settings(self):
-        if self.busy: return
-        window=ctk.CTkToplevel(self); window.title('连接设置'); window.geometry('590x240'); window.transient(self)
-        self.label(window,'雷电 ADB 路径',14).pack(anchor='w',padx=22,pady=(20,8))
-        row=ctk.CTkFrame(window,fg_color='transparent'); row.pack(fill='x',padx=22)
-        ctk.CTkEntry(row,textvariable=self.adb,height=36,width=420).pack(side='left',fill='x',expand=True)
-        self.button(row,'浏览',self.browse,width=70).pack(side='left',padx=(8,0))
-        self.label(window,'启动雷电后点击自动检测，再选择对应的模拟器实例。\n游戏要求：国服、竖屏 9:16、已登录大厅。',12,MUTED,justify='left').pack(anchor='w',padx=22,pady=14)
-        self.button(window,'自动检测',self.devices,width=110).pack(side='left',padx=22,pady=12)
-        self.button(window,'保存并关闭',lambda:(self.save_preferences(),window.destroy()),True,width=110).pack(side='right',padx=22,pady=12)
+        self.open_settings('连接设置')
 
     def preview_loop(self):
         if self.engine.controller and self.live.get() and not self.preview_busy:

@@ -10,6 +10,7 @@ import threading
 import tkinter as tk
 import customtkinter as ctk
 from modern_ui import ModernUI, BLUE
+from schedule_ui import ScheduleUI
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from pathlib import Path
 from uuid import uuid4
@@ -17,9 +18,10 @@ from uuid import uuid4
 from PIL import Image, ImageTk
 from engine import Engine, ROOT, NO_WINDOW
 from portable import VERSION, discover_adb, discover_device_names
+from emulator_launch import normalize_emulator, ensure_emulator, startup_tasks
 
 
-class App(ModernUI, ctk.CTk):
+class App(ModernUI, ScheduleUI, ctk.CTk):
     def __init__(self, auto_scan=True):
         ctk.set_appearance_mode('light')
         ctk.set_widget_scaling(1.0)
@@ -45,17 +47,19 @@ class App(ModernUI, ctk.CTk):
         settings = self.load_json(ROOT / 'settings.json', {})
         self.adb = tk.StringVar(value=settings.get('adb', ''))
         self.serial = tk.StringVar(value=settings.get('serial', ''))
+        self.emulator_config=normalize_emulator(settings.get('emulator'),self.serial.get(),self.adb.get())
         self.device_display = tk.StringVar(value=self.serial.get())
         self.device_serials = {}
         self.action = tk.StringVar(value='click')
         self.engine.options = settings.get('options', {})
         self.build_ui(settings)
+        self.init_schedule(settings,active=auto_scan)
         self.bind('<F8>', lambda event: self.engine.stop())
         self.global_hotkey = bool(os.name == 'nt' and ctypes.windll.user32.RegisterHotKey(
             None, 0x4e4b, 0x4000, 0x77))
         self.protocol('WM_DELETE_WINDOW', self.close)
         self.after(100, self.pump)
-        self.log('先登录国服大厅，再连接并运行选中任务。内置任务适配竖屏 9:16。')
+        self.log('运行任务时自动启动所选模拟器与游戏；可在连接设置配置程序路径和实例编号。内置任务适配竖屏 9:16。')
         self.log('全局 F8 停止已启用。' if self.global_hotkey else 'F8 仅在助手窗口聚焦时有效。')
         if auto_scan:
             self.devices()
@@ -129,9 +133,11 @@ class App(ModernUI, ctk.CTk):
         self.adb.set(adb)
         labels = {serial: f'{names.get(serial, "Android 设备")}（{serial}）'
                   for serial in devices}
+        if self.serial.get() and self.serial.get() not in labels:
+            labels[self.serial.get()]=f'未启动（{self.serial.get()}）'
         self.device_serials = {label: serial for serial, label in labels.items()}
         self.device_box.configure(values=list(self.device_serials))
-        if self.serial.get() not in devices:
+        if not self.serial.get():
             self.serial.set(suggested)
         self.device_display.set(labels.get(self.serial.get(), ''))
 
@@ -164,7 +170,9 @@ class App(ModernUI, ctk.CTk):
             self.log('请先查找设备并选择一个模拟器实例。')
             return
         def fn():
-            self.engine.connect(adb, serial)
+            self.engine.stop_event.clear()
+            found=ensure_emulator(adb,serial,self.emulator_config,self.engine.log,self.engine.stop_event)
+            self.engine.connect(found, serial)
             (ROOT / 'settings.json').write_text(json.dumps({**self.load_json(ROOT / 'settings.json', {}), 'adb': adb, 'serial': serial}), encoding='utf-8')
             self.events.put(('image', self.engine.screenshot()))
         self.work(fn)
@@ -289,9 +297,8 @@ class App(ModernUI, ctk.CTk):
             return
         self.save_preferences()
         def fn():
-            found = discover_adb(adb)
-            if not found:
-                raise RuntimeError('未找到 ADB，请启动雷电或在连接设置中选择 adb.exe。')
+            self.engine.stop_event.clear()
+            found=ensure_emulator(adb,serial,self.emulator_config,self.engine.log,self.engine.stop_event)
             # Always establish the selected connection before starting, including after
             # emulator restarts or switching instances. Failure must not run any task.
             self.events.put(('log', '正在自动连接模拟器…'))
@@ -302,7 +309,7 @@ class App(ModernUI, ctk.CTk):
                        for task in selected for step in task.get('steps', [])):
                     raise RuntimeError('任务采集尺寸与当前截图不一致，请恢复原尺寸和方向。')
             self.events.put(('image', screenshot))
-            self.engine.run(selected)
+            self.engine.run(startup_tasks(selected,self.emulator_config))
             self.events.put(('image', self.engine.screenshot()))
         self.work(fn)
 
@@ -333,8 +340,10 @@ def main():
         try:
             if not selected:
                 raise RuntimeError('没有选中任务')
-            engine.connect(settings['adb'],settings['serial'])
-            engine.run(selected)
+            config=normalize_emulator(settings.get('emulator'),settings.get('serial',''))
+            found=ensure_emulator(settings.get('adb',''),settings.get('serial',''),config,log,engine.stop_event)
+            engine.connect(found,settings['serial'])
+            engine.run(startup_tasks(selected,config))
         except Exception as exc:
             log('RuntimeError: '+str(exc))
         failures=[m for m in messages if m.startswith(('失败：','RuntimeError:')) or '未完成步骤' in m]

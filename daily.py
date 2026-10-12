@@ -22,6 +22,7 @@ class Daily:
         engine.tasker = self.t
         self.options = engine.options
         self.items = []
+        self.reward_generation = 0
 
     def wait(self, seconds=1):
         if self.e.stop_event.wait(seconds):
@@ -32,6 +33,12 @@ class Daily:
         self.acquire_dismissed = False
         for attempt in range(7):
             self.scan_raw()
+            close=self.announcement_close() or self.maintenance_close() or self.notification_close()
+            if close:
+                if attempt==6:raise RuntimeError('弹窗关闭后仍反复出现，未继续点击')
+                self.e.log('统一关闭公告或通知，继续当前任务')
+                self.tap(*close,delay=2)
+                continue
             promotion=self.promotion_close()
             if promotion:
                 if attempt==6:raise RuntimeError('礼包推销弹窗关闭重试已达上限')
@@ -58,18 +65,18 @@ class Daily:
                 self.tap(x+w/2,y+h/2,delay=2)
                 self.acquire_dismissed=True
                 continue
-            reward=self.find('^奖励$',(350,650,400,250))
-            claim=self.find('点击领取奖励',(150,1050,850,600))
+            claim=self.reward_dialog_close()
             result_prompt=self.find('点击任意处进行下一步',(200,1500,800,270))
             result_page=(result_prompt and self.find('总伤害',(0,700,1080,250))
                          and self.find('阶段',(0,900,250,220)))
-            if (reward and claim) or result_page:
+            if claim or result_page:
                 if attempt==6:
                     raise RuntimeError('奖励弹窗关闭重试已达上限')
                 self.e.log('统一关闭奖励弹窗，重新识别当前页面')
-                x,y,w,h=(claim if reward and claim else result_prompt)['box']
+                x,y,w,h=(claim or result_prompt)['box']
                 self.tap(x+w/2,y+h/2,delay=2)
                 self.reward_dismissed=True
+                self.reward_generation+=1
                 continue
             if not (self.find('LEVEL.*UP',(300,700,500,220))
                     and self.find('指挥官升级',(350,800,400,200))):
@@ -82,6 +89,18 @@ class Daily:
             self.e.log('关闭指挥官升级奖励，继续当前任务')
             x,y,w,h=prompt['box']
             self.tap(x+w/2,y+h/2,delay=1.5)
+
+    def reward_dialog_close(self):
+        """Return the observed reward prompt for both small and expanded dialogs."""
+        title=self.find(r'^\s*奖励\s*$',(200,250,680,850))
+        prompt=self.find(r'^\s*点击领取奖励\s*$',(120,800,840,950))
+        if not title or not prompt:
+            return None
+        # Both anchors must belong to a central dialog, with its prompt below
+        # the title. Never infer a close action from an arbitrary Confirm button.
+        if title['box'][1]+title['box'][3] >= prompt['box'][1]:
+            return None
+        return prompt
 
     def promotion_close(self):
         close=self.find(r'^点击(?:.*)关闭(?:画面|页面)?[。.]?$',(150,1650,850,250))
@@ -200,6 +219,20 @@ class Daily:
         if not self.blue(800,y):return None
         return self.close_cross(range(944,975,2),range(y-14,y+15,2))
 
+    def notification_close(self):
+        """Dismiss a blue notification only when its white close cross is visible."""
+        title=self.find('^通知$',(380,450,320,220))
+        if not title:return None
+        # A cancel/confirm choice belongs to the current task (for example,
+        # zero-price shop refresh). Dismissing it here prevents completion.
+        if (self.find('^取消$',(50,850,980,650))
+                or self.find('是否更新商品|重置购买次数|消耗资金')):return None
+        # Supplies uses this notification to verify that batch drawing stopped.
+        if self.find('A型物资.*批量获取已结束',(100,750,900,160)):return None
+        y=round(title['box'][1]+title['box'][3]/2)
+        if not self.blue(800,y):return None
+        return self.close_cross(range(944,987,2),range(y-18,y+19,2))
+
     def close_cross(self, xs, ys):
         """A white cross with two strokes, rejecting plain white areas."""
         # OCR text and the icon can differ slightly in vertical alignment.
@@ -234,10 +267,19 @@ class Daily:
                                            int(x+w/2)+70,int(y+h/2)+15)),dtype=np.int16)
         return bool(np.mean((pixels.max(2)-pixels.min(2)>60)&(pixels.max(2)>140))>.18)
 
+    def mailbox_close(self):
+        if (self.find('^邮箱$',(430,190,330,180))
+                and self.find('保存上限',(120,430,850,200))
+                and self.find('^全部领取$',(580,1520,460,220))):
+            return self.close_cross(range(940,983,2),range(235,283,2))
+        return None
+
     def supplies_close(self):
-        if (self.find('获得18次物资|获取18次物资',(100,450,950,150))
-                and self.find('获取3份物资',(500,1680,550,160))
-                and self.find('爆发能量',(300,1470,500,130))):
+        from supplies_flow import Supplies
+        # The batch amount changes with ticket count and bonus energy; the
+        # disabled button also retains an amount after all tickets are used.
+        # Identify the activity itself rather than one amount on its button.
+        if Supplies(self).is_event():
             return self.close_cross(range(960,1011,2),range(165,221,2))
         return None
 
@@ -285,6 +327,10 @@ class Daily:
                 continue
             if not handled:
                 return False
+            if self.find('限时活动页面',(0,0,500,160)) and self.find('返回',(0,1750,300,170)):
+                # Closing an activity overlay returns to its list, where home()
+                # can use the visible navigation instead of waiting for Lobby.
+                return True
             # Subsequent login popups appear after a brief lobby transition.
             if self.lobby():
                 idle+=1;unconfirmed=0
@@ -298,8 +344,23 @@ class Daily:
 
     def home(self):
         self.dismiss_startup_popups()
+        if (close:=self.mailbox_close()):
+            from engine import adb_run
+            frame=Image.open(io.BytesIO(self.e.screenshot()))
+            adb_run(self.e.adb,self.e.serial,'shell','input','tap',
+                    str(round(close[0]*frame.width/1080)),str(round(close[1]*frame.height/1920)))
+            self.e.log('恢复大厅：关闭邮箱窗口')
+            self.wait(2);self.scan()
         if self.lobby():
             return
+        if (self.find('^好友$',(380,160,340,150))
+                and self.find('好友目录',(100,300,450,160))
+                and self.find('^QQ好友$',(400,300,400,160))):
+            close=self.close_cross(range(944,987,2),range(218,255,2))
+            if close:
+                self.e.log('恢复大厅：关闭好友列表')
+                self.tap(*close,delay=2)
+                self.scan()
         if self.find('请选择增益效果',(250,300,600,160)):
             self.e.log('恢复未完成的模拟室结算流程')
             self.complete_simulation()
@@ -329,9 +390,21 @@ class Daily:
         if self.pass_page():
             self.tap(975,132,3)
             self.scan()
+        if (self.find(r'^[·•.\s]*任务[·•.\s]*$',(400,130,280,150))
+                and self.find('每日任务',(80,290,330,130))
+                and self.find('全部领取',(650,1640,380,150))):
+            self.tap(990,132,2);self.scan()
+        if self.find('好感度已达到满级') and self.find('是否继续咨询'):
+            self.click_text('^取消$',(100,1100,450,200))
+            self.wait(2);self.scan()
         if self.find('消耗次数',(0,1480,500,160)) and self.find('批量咨询',(720,1580,350,220)):
-            self.click_text('^关闭$',(720,1740,350,160))
-            self.expect('^返回$',(0,1750,250,130),timeout=20)
+            for _ in range(3):
+                self.click_text('^关闭$',(720,1740,350,160))
+                self.wait(2);self.scan()
+                if not self.find('消耗次数',(0,1480,500,160)):
+                    break
+            else:
+                raise RuntimeError('批量咨询名单未关闭')
         # Tower/stage detail sheets cover the navigation bar. Close only a
         # positively identified stage sheet before looking for Home.
         if self.find('关卡信息') and self.find('进入战斗',(400,1600,680,320)):
@@ -364,12 +437,19 @@ class Daily:
                 self.wait(1)
         raise RuntimeError('未确认大厅，请手动关闭弹窗再运行')
 
-    def reward(self):
+    def reward(self, since=None):
         # Rewards fade in after the server response; do not inspect only once mid-animation.
+        before=self.reward_generation if since is None else since
+        if self.reward_generation>before:
+            return True
         self.wait(2)
         self.scan()
-        if self.reward_dismissed:
+        if self.reward_generation>before:
             return True
+        if since is not None:
+            # Simulation requires a recognized reward dialog or result page;
+            # an unrelated "continue" prompt must not count as settlement.
+            return False
         if self.click_text('点击领取奖励|点击.*继续', (160, 650, 800, 980)):
             self.scan()
             return True
@@ -390,6 +470,9 @@ class Daily:
         self.expect(page, (0, 0, 300, 150))
 
     def run(self, kind):
+        if kind == 'event_supplies':
+            from supplies_flow import Supplies
+            return Supplies(self).run()
         if kind == 'dispatch':
             self.scan()
             if self.confirm_dispatch():
@@ -398,7 +481,10 @@ class Daily:
                 return
         if kind in ('event_daily','event_wisdom_daily'):
             from event_flow import EventActivities
-            return EventActivities(self,layout='wisdom' if kind=='event_wisdom_daily' else 'sphere').run()
+            outcome=EventActivities(self,layout='wisdom' if kind=='event_wisdom_daily' else 'sphere').run()
+            self.home()
+            self.e.log('已确认返回大厅')
+            return outcome
         if kind == 'event_push':
             from event_flow import EventPush
             outcome=EventPush(self).run()
@@ -414,7 +500,7 @@ class Daily:
 
     def missions(self):
         self.tap(984, 470)
-        self.expect('^任务$', (400, 130, 280, 150))
+        self.expect(r'^[·•.\s]*任务[·•.\s]*$', (400, 130, 280, 150))
         for x, tab, key in ((204, '每日','daily'), (445, '每周','weekly'), (680, '主线','main'), (900, '成就','achievement')):
             if not self.options.get('mission_'+key,True):
                 continue
@@ -427,6 +513,14 @@ class Daily:
                 self.reward()
             else:
                 raise RuntimeError('任务奖励领取超过上限')
+            if key=='daily':
+                self.scan()
+                if not (self.find('已完成所有任务') and self.find('CLEARED')):
+                    raise RuntimeError('每日任务尚未显示完成，不能仅凭领取按钮变灰标记完成')
+                folder=ROOT/'validation';folder.mkdir(exist_ok=True)
+                self.image.save(folder/'daily-missions-completed.png')
+                (folder/'daily-missions-completed.json').write_text(json.dumps(self.items,ensure_ascii=False,indent=2),encoding='utf-8')
+                self.e.log('已核实每日任务完成及全部积分奖励领取')
         self.tap(990, 132)
         if not self.lobby():
             raise RuntimeError('关闭任务窗口后未确认大厅')
@@ -493,7 +587,22 @@ class Daily:
         return True
 
     def dispatch(self):
-        self.tap(415, 1570)
+        self.scan()
+        if not self.find('派遣公告栏', (90, 180, 700, 230)):
+            if not self.find('^前哨基地$', (0, 0, 350, 150)):
+                if not self.click_text('^前哨基地$', (0, 1340, 560, 330)):
+                    raise RuntimeError('未识别大厅前哨基地入口')
+                self.expect('^前哨基地$', (0, 0, 350, 150))
+            for attempt in range(3):
+                self.scan()
+                if self.find('派遣公告栏', (90, 180, 700, 230)):
+                    break
+                board=self.find('^派遣公告栏$', (490, 1730, 290, 190))
+                if not board or not self.find('^前哨基地$', (0, 0, 350, 150)):
+                    raise RuntimeError('前哨基地地图未识别派遣公告栏入口')
+                x,y,w,h=board['box']
+                self.e.log('点击派遣公告栏图标')
+                self.tap(x+w/2,y-65,delay=3,hold_ms=100)
         self.expect('派遣公告栏', (90, 180, 700, 230))
         for _ in range(3):
             self.scan()
@@ -759,20 +868,30 @@ class Daily:
         quick = self.find('^快速模拟$', (550, 1510, 430, 210))
         if not quick or not self.colorful_button(quick):
             raise RuntimeError('当前难度未开放快速模拟')
+        reward_before=self.reward_generation
         self.click_text('^快速模拟$', (550, 1510, 430, 210))
         self.scan()
+        if self.finish_simulation_result():
+            return
         if self.find('确认|确定'):
             self.click_text('^确认$|^确定$', blue=True)
-        self.complete_simulation()
+        self.complete_simulation(reward_before)
 
-    def complete_simulation(self):
+    def complete_simulation(self, reward_before=None):
         # The explanatory sentence also contains "快速模拟". Only click the
         # exact button, and require a real reward before reporting completion.
+        if reward_before is None:
+            reward_before=self.reward_generation
         finished=False
         deadline=time.monotonic()+60
         buffs=0
         while time.monotonic()<deadline:
             self.scan()
+            if self.finish_simulation_result():
+                return
+            if self.reward_generation>reward_before:
+                finished=True
+                break
             if self.find('请选择增益效果'):
                 if buffs>=3:
                     raise RuntimeError('增益选择超过3次，停止避免重复点击')
@@ -788,7 +907,7 @@ class Daily:
                     raise RuntimeError('模拟室最终战斗失败')
                 finished=True
                 break
-            if self.reward():
+            if self.reward(since=reward_before):
                 finished=True
                 break
             self.wait(1)
@@ -894,10 +1013,9 @@ class Daily:
             if self.find('^挑战$',(260,1430,580,240)):
                 self.click_text('^挑战$',(260,1430,580,240))
                 self.expect('快速战斗',(550,1500,520,240))
-            count=self.find(r'[0-3]\s*[/／]\s*3',(550,1660,520,240))
-            if not count:
+            before=self.interception_remaining()
+            if before is None:
                 raise RuntimeError('未确认拦截剩余次数')
-            before=int(re.search(r'([0-3])\s*[/／]\s*3',count['text'])[1])
             if before==0:
                 self.e.log('拦截战次数已用完')
                 return
@@ -921,15 +1039,34 @@ class Daily:
             self.wait_interception_settled(before)
             self.e.log('已核实拦截次数减少')
 
+    def interception_remaining(self):
+        item=(self.find(r'[0-3]\s*[/／]\s*3',(550,1660,520,240))
+              or self.find(r'[0-3]\s*[/／]\s*3',(0,120,560,180)))
+        if item:
+            return int(re.search(r'([0-3])\s*[/／]\s*3',item['text'])[1])
+        # The small white counter can read as 2/2 in full-screen OCR.
+        # Re-read its original pixels at larger scale on the confirmed page.
+        if not (self.find('异常个体拦截战',(0,0,400,160))
+                and self.find('^进入战斗$',(550,1660,520,240))):
+            return None
+        crop=self.image.crop((830,1775,940,1830)).resize((440,220))
+        result=self.t.post_recognition('OCR',JOCR(expected=[r'[0-3]\s*[/／]\s*3'],
+            only_rec=True,threshold=.3),np.asarray(crop)[:,:,::-1].copy()).wait().get()
+        for node in result.nodes if result else []:
+            if not node.recognition:continue
+            for reading in node.recognition.filtered_results:
+                match=re.search(r'([0-3])\s*[/／]\s*3',reading.text)
+                if match:return int(match[1])
+        return None
+
     def wait_interception_settled(self, before):
         # The old count remains visible under the quick-battle reward animation.
         # Rescan/dismiss its result until the server updates the remaining count.
         deadline=time.monotonic()+35
         while time.monotonic()<deadline:
             self.scan()
-            after=(self.find(r'[0-3]\s*[/／]\s*3',(550,1660,520,240))
-                   or self.find(r'[0-3]\s*[/／]\s*3',(0,120,560,180)))
-            if after and int(re.search(r'([0-3])\s*[/／]\s*3',after['text'])[1])<before:
+            after=self.interception_remaining()
+            if after is not None and after<before:
                 return
             self.wait(1)
         raise RuntimeError('拦截次数未减少，不标记成功或重复挑战')
@@ -1007,6 +1144,23 @@ class Daily:
             self.e.log('跳过'+label+'剧情');self.tap(970,50,2);return True
         return False
 
+    def bond_role_name(self):
+        """Single-letter names can be missed by full-screen text detection."""
+        expression=r'^[^\d/]+$'
+        roi=(50,1150,500,100)
+        role=self.find(expression,roi)
+        if role:
+            return role['text'].strip()
+        x,y,w,h=roi
+        crop=self.image.crop((x,y,x+w,y+h)).resize((w*3,h*3))
+        self.wait(.05)
+        result=self.t.post_recognition('OCR',JOCR(expected=[expression],only_rec=True,threshold=.7),
+                                      np.asarray(crop)[:,:,::-1].copy()).wait().get()
+        names=[item.text.strip() for node in result.nodes if node.recognition
+               for item in node.recognition.filtered_results] if result else []
+        names=[name for name in names if name and re.fullmatch(expression,name)]
+        return names[0] if len(names)==1 else None
+
     def bond_rewards(self):
         self.expect('咨询次数',(70,400,460,110))
         top_previous=None
@@ -1026,13 +1180,14 @@ class Daily:
                     self.bond_scroll(1550,1050);continue
                 self.tap(600,y+70,2)
                 self.expect('查看花絮',(750,900,330,500))
-                role=self.find(r'^[^\d/]+$',(50,1150,500,100))
+                role=self.bond_role_name()
                 if not role:raise RuntimeError('未确认花絮角色名称')
-                if role['text'] in handled:
+                role_key=re.sub(r'\s+','',role).casefold()
+                if role_key in handled:
                     raise RuntimeError('已处理角色仍有花絮红点，不重复进入')
                 self.click_text('查看花絮',(750,900,330,500))
                 claimed+=self.bond_chapters()
-                handled.add(role['text'])
+                handled.add(role_key)
                 self.click_text('^返回$',(0,1720,280,180))
                 self.expect('咨询次数',(70,400,460,110))
                 previous=None;continue
@@ -1044,6 +1199,14 @@ class Daily:
 
     def advise(self):
         outcome=self.advise_batch()
+        for _ in range(9):
+            self.scan()
+            remaining=self.advise_remaining()
+            if remaining==0 or outcome=='skipped':break
+            if remaining is None:raise RuntimeError('批量咨询结束后未识别剩余次数')
+            self.home()
+            outcome=self.advise_batch()
+        else:raise RuntimeError('咨询次数仍未用完')
         claimed=self.bond_rewards()
         return None if claimed else outcome
 
@@ -1055,6 +1218,8 @@ class Daily:
         self.expect('咨询次数', (70, 400, 460, 110))
         before=self.advise_remaining()
         if before==0:
+            folder=ROOT/'validation';folder.mkdir(exist_ok=True)
+            self.image.save(folder/'consultations-used.png')
             self.e.log('今日咨询次数已用完')
             return 'skipped'
         if before is None:
@@ -1068,9 +1233,24 @@ class Daily:
         match=re.search(r'消耗次数\s*(\d+)\s*[/／]\s*(\d+)',selected['text'])
         count=int(match.group(1))
         if count==0:
-            self.click_text('^关闭$',(720,1740,350,160))
-            self.e.log('游戏批量名单没有可咨询角色，跳过')
-            return 'skipped'
+            # A saved batch may contain only today's already-consulted roles.
+            # Select a visible remaining role into the empty slot and verify
+            # the actual consumption before submitting, rather than skipping.
+            for _ in range(20):
+                rows=sorted([item for item in self.items if re.search('好感等级',item['text'])
+                             and 550<item['box'][1]<1400],key=lambda item:item['box'][1])
+                for row in rows:
+                    y=row['box'][1]
+                    self.tap(600,y+80,2);self.scan()
+                    selected=self.find(r'消耗次数\s*(\d+)\s*[/／]\s*(\d+)',(0,1480,500,160))
+                    if selected:
+                        count=int(re.search(r'消耗次数\s*(\d+)',selected['text'])[1])
+                    if count:break
+                if count:break
+                self.bond_scroll(1400,650);self.scan()
+            if count==0:
+                self.click_text('^关闭$',(720,1740,350,160))
+                raise RuntimeError('仍有免费咨询次数，但未找到可加入批量名单的角色')
         if count>before:
             raise RuntimeError('批量咨询消耗超过剩余免费次数')
         if self.find('钻石|购买'):
@@ -1084,9 +1264,14 @@ class Daily:
             if remaining==before-count:
                 if self.find('消耗次数',(0,1480,500,160)):
                     self.click_text('^关闭$',(720,1740,350,160))
+                folder=ROOT/'validation';folder.mkdir(exist_ok=True)
+                self.image.save(folder/'consultations-used.png')
                 self.e.log(f'批量咨询已完成 {count} 次，剩余 {remaining}/10')
                 return
-            if self.find('是否.*批量咨询',(100,700,850,300)):
+            if (self.find('是否.*批量咨询',(100,700,850,300))
+                    or (self.find('好感度已达到满级') and self.find('是否继续咨询'))):
+                if self.find('钻石|购买'):
+                    raise RuntimeError('咨询确认出现付费提示')
                 self.click_text('^确认$|^确定$',(300,900,760,800),blue=True)
             self.wait(1)
         raise RuntimeError('批量咨询后次数未减少，不标记完成')
@@ -1096,16 +1281,57 @@ class Daily:
             raise RuntimeError('大厅队员招募入口未识别')
         self.expect('^招募队员$',(0,0,320,180))
         self.wait(2); self.scan()
-        free_roi=(0,1450,420,330)
+        for _ in range(4):
+            if self.recruit_tab()==0: break
+            self.tap(55,1000,delay=3,hold_ms=100)
+            self.scan()
+        else:
+            raise RuntimeError('未确认第一个招募卡池，不标记全卡池检查')
+        seen=set();claimed=0
+        for _ in range(8):
+            self.scan()
+            tab=self.recruit_tab()
+            if tab in seen:
+                self.e.log(f'全部招募卡池已检查，本轮免费抽取{claimed}次')
+                return None if claimed else 'skipped'
+            seen.add(tab)
+            self.e.log(f'检查招募卡池第{tab+1}页')
+            if self.recruit_free_current(): claimed+=1
+            if len(seen)==4:
+                self.e.log(f'全部4个招募卡池已检查，本轮免费抽取{claimed}次')
+                return None if claimed else 'skipped'
+            self.scan()
+            if not self.find('^招募队员$',(0,0,320,180)):
+                raise RuntimeError('未确认招募主页，不切换卡池')
+            self.tap(1020,1000,delay=3,hold_ms=100)
+            self.scan()
+            if self.recruit_tab()==tab:
+                raise RuntimeError('招募卡池未切换，不标记全部检查完成')
+        raise RuntimeError('招募卡池检查达到上限')
+
+    def recruit_tab(self):
+        for index,x in enumerate((474,518,562,606)):
+            pixels=np.asarray(self.image.crop((x-3,1665,x+4,1672)))
+            if np.mean((pixels[:,:,2]>170)&(pixels[:,:,1]>90)&(pixels[:,:,0]<100))>.7:
+                return index
+        raise RuntimeError('未识别招募卡池页码')
+
+    def recruit_free_available(self):
+        roi=(0,1450,380,210)
+        return bool(self.find(r'每日免费\s*[1一]\s*次',roi)
+                    and self.find('^招募[1１]名$',roi)
+                    and self.find('不[获得]{2}积分',roi)
+                    and self.notification_dots((305,1495,55,65)))
+
+    def recruit_free_current(self):
+        free_roi=(0,1450,380,210)
         free=self.find(r'每日免费\s*[1一]\s*次',free_roi)
         if not free:
-            if self.recruit_paid_only():
-                self.e.log('每日免费招募入口已消失，已使用，跳过')
-                return 'skipped'
-            raise RuntimeError('当前招募页未识别每日免费一次入口，不执行招募')
-        if not self.colorful_button(free):
-            self.e.log('每日免费招募已使用，跳过')
-            return 'skipped'
+            self.e.log('当前卡池未识别免费单抽入口，继续检查其他卡池')
+            return False
+        if not self.recruit_free_available():
+            self.e.log('当前卡池免费单抽无可用提示，继续检查其他卡池')
+            return False
         if not self.find('招募1名|招募１名',free_roi):
             raise RuntimeError('未确认免费单次招募按钮')
         self.e.log('领取每日免费单次招募')
@@ -1120,12 +1346,12 @@ class Daily:
                 settled=True
             if self.find('^招募队员$',(0,0,320,180)):
                 free=self.find(r'每日免费\s*[1一]\s*次',free_roi)
-                if free and not self.colorful_button(free):
+                if settled and free and not self.recruit_free_available():
                     self.e.log('免费招募已结算，免费入口已不可用')
-                    return
+                    return True
                 if settled and not free and self.recruit_paid_only():
                     self.e.log('免费招募已结算，免费入口已消失')
-                    return
+                    return True
             if self.click_text('^SKIP$|^跳过$',(650,0,430,330)):
                 continue
             if self.finish_recruit_result():
@@ -1176,7 +1402,17 @@ class Daily:
                 raise RuntimeError('企业塔剩余次数未确认')
             before=int(re.search(r'([0-3])\s*[/／]\s*3',before['text'])[1])
             if not self.find('进入战斗',(400,1600,680,320)):
-                self.tap(540, 800)
+                # This 3D portal responds to native device coordinates.
+                # Verify the stage sheet after each bounded entry attempt.
+                from engine import adb_run
+                for attempt in range(3):
+                    if self.find('进入战斗',(400,1600,680,320)):break
+                    if not self.find('剩余次数',(200,1450,880,460)):
+                        raise RuntimeError('企业塔页面变化，停止点击入口')
+                    frame=Image.open(io.BytesIO(self.e.screenshot()))
+                    adb_run(self.e.adb,self.e.serial,'shell','input','tap',
+                            str(round(550*frame.width/1080)),str(round(825*frame.height/1920)))
+                    self.wait(3);self.scan()
                 self.expect('进入战斗',(400,1600,680,320))
             if not self.battle('剩余次数'):
                 return 'skipped'

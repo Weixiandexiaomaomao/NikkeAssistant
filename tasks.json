@@ -22,7 +22,8 @@
       "AlreadyDone": "邮箱无可领奖励，返回大厅",
       "Reward": "关闭奖励弹窗",
       "Done": "已确认大厅",
-      "LevelUp": "关闭指挥官升级奖励弹窗"
+      "LevelUp": "关闭指挥官升级奖励弹窗",
+      "CommonRewardDismiss": "统一关闭奖励弹窗，继续当前任务"
     },
     "status": "已实测",
     "default": true
@@ -42,7 +43,8 @@
       "Reward": "关闭奖励弹窗",
       "Done": "已确认大厅",
       "ConfirmSocial": "确认好友点收发完成通知",
-      "LevelUp": "关闭指挥官升级奖励弹窗"
+      "LevelUp": "关闭指挥官升级奖励弹窗",
+      "CommonRewardDismiss": "统一关闭奖励弹窗，继续当前任务"
     },
     "status": "已实测",
     "default": true
@@ -62,7 +64,8 @@
       "Empty": "当前没有奖励，返回大厅",
       "CloseAfterReward": "领取后返回大厅",
       "Done": "已确认大厅",
-      "LevelUp": "关闭指挥官升级奖励弹窗"
+      "LevelUp": "关闭指挥官升级奖励弹窗",
+      "CommonRewardDismiss": "统一关闭奖励弹窗，继续当前任务"
     },
     "status": "已实测",
     "default": true
@@ -188,6 +191,16 @@
     "aspect": 0.5625
   },
   {
+    "id": "event_supplies",
+    "name": "5×5 Supplies 物资活动",
+    "handler": "event_supplies",
+    "status": "入口、任务检查与退出已实测；开箱链路截图回放通过",
+    "default": true,
+    "description": "领取活动任务物资，使用现有物资批量获取奖励；获得A型物资后确认开启下一箱，关闭完成奖励并继续。核对箱号及物资数量变化，物资用完后返回大厅。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
     "id": "event_continue",
     "name": "活动推图 · 从当前关卡继续",
     "handler": "event_push",
@@ -199,11 +212,11 @@
   },
   {
     "id": "cn_recruit_free",
-    "name": "每日免费单次招募",
+    "name": "每日免费单次招募 · 各卡池",
     "handler": "recruit_free",
-    "status": "免费抽取、结果确认、已用跳过及返回已实测",
+    "status": "两种特殊卡池免费抽取及结果确认已实测",
     "default": true,
-    "description": "识别每日免费一次入口，仅招募1名，处理结果后返回大厅。免费次数已用完时跳过，不花钻石或招募券。",
+    "description": "逐个检查当前4个招募卡池，核对免费单抽文字、招募1名与可用红点，只领取现有每日免费次数。结算后确认免费入口消失，再检查下一卡池，最终返回大厅。不使用钻石、招募券或友情点。",
     "package": "com.tencent.nikke",
     "aspect": 0.5625
   },

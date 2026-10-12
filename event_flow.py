@@ -35,40 +35,63 @@ class EventActivities:
                     v.find('签到印章', (550,1400,530,250)) and
                     v.find('STORY', (0,1300,500,400)))
 
+    def continue_intro(self):
+        v = self.v
+        title = ('WISDOM', 'SPRING') if self.layout == 'wisdom' else (r'[UC]NBREAKABLE', 'SPHERE')
+        if not all(v.find(word, (100,1200,930,540)) for word in title):
+            return False
+        prompt = v.find(r'^TOUCH\s*TO\s*CONTINUE$', (100,1700,930,220))
+        if not prompt:
+            return False
+        v.e.log('确认活动标题页，点击继续进入活动')
+        x,y,w,h = prompt['box']
+        v.tap(x+w/2,y+h/2,delay=3)
+        return True
+
     def home(self):
         v = self.v
         rotations = 0
-        for _ in range(5):
+        for _ in range(8):
             v.scan()
             if self.is_home():
                 return
+            if self.continue_intro():
+                continue
             if self.layout=='wisdom' and v.find('活动地区',(0,0,300,180)) and v.find('签到印章'):
                 v.home()
                 continue
             if v.find('^大厅$', (450,1820,180,100)) and v.lobby():
                 banner = (550,1450,530,280)
-                wanted='WISDOM|SPRING' if self.layout=='wisdom' else 'UNBREAKABLE'
-                other='UNBREAKABLE' if self.layout=='wisdom' else 'WISDOM|SPRING'
+                wanted='WISDOM|SPRING' if self.layout=='wisdom' else r'[UC]N\s*BREAKABLE|SPHERE'
+                other=r'[UC]N\s*BREAKABLE|SPHERE' if self.layout=='wisdom' else 'WISDOM|SPRING'
                 if v.find(wanted,banner):
                     v.e.log('从大厅进入 '+('WISDOM SPRING' if self.layout=='wisdom' else 'UNBREAKABLE SPHERE')+' 活动')
                     v.click_text(wanted,banner)
-                    v.expect('剧情活动' if self.layout=='wisdom' else '活动地区',(0,0,300,180),timeout=35)
                     # The header appears before the animated menu. Do not use
                     # Back while its remaining controls are still loading, and
                     # check the final entry even on the last navigation attempt.
-                    deadline = time.monotonic() + 15
+                    deadline = time.monotonic() + 50
                     while time.monotonic() < deadline:
                         v.scan()
                         if self.is_home():
                             return
+                        if self.continue_intro():
+                            continue
                         v.wait(1)
                     raise RuntimeError('活动首页菜单加载后仍未识别，请保留截图')
                 elif rotations < 2 and v.find(other,banner):
                     # The observed lobby carousel has a refresh button at its lower right.
                     v.tap(1030,1700)
                     rotations += 1
+                elif rotations >= 2 and v.find(other,banner):
+                    v.e.log('大厅未发现 '+('WISDOM SPRING' if self.layout=='wisdom' else
+                            'UNBREAKABLE SPHERE')+' 活动入口，跳过本轮')
+                    return False
                 else:
-                    raise RuntimeError('大厅未识别到所选活动入口，请确认活动仍开放')
+                    # Animated banners can miss one full-screen OCR pass.
+                    # Retry before treating a visible activity as absent.
+                    v.wait(2)
+                    continue
             elif v.find('关卡信息') and v.find('进入战斗'):
                 # Close the selected-stage sheet before using the bottom back button.
                 v.tap(1050,1000)
@@ -83,7 +106,8 @@ class EventActivities:
             elif v.find('返回', (0,1750,300,170)):
                 v.click_text('返回', (0,1750,300,170))
             else:
-                raise RuntimeError('请先进入 UNBREAKABLE SPHERE 活动首页；未识别可返回活动的页面')
+                v.wait(2)
+                continue
             v.wait(3)
         raise RuntimeError('未确认返回活动首页')
 
@@ -96,6 +120,7 @@ class EventActivities:
     def open_menu(self, expression, page):
         self.home()
         v = self.v
+        v.expect(expression,(0,1350,1080,390),timeout=20)
         if not v.click_text(expression,(0,1350,1080,390)):
             raise RuntimeError('未识别活动入口：'+expression)
         v.expect(page,timeout=35)
@@ -130,13 +155,20 @@ class EventActivities:
 
     @staticmethod
     def stage_number(text):
-        match = re.fullmatch(r'\s*(?:Event\s*)?(\d+)\s*[-－]\s*(\d+)\s*',text,re.I)
+        text=re.sub(r'^\s*Event\s*','',text,flags=re.I)
+        text=text.translate(str.maketrans({'l':'1','I':'1','O':'0'}))
+        match = re.fullmatch(r'\s*(\d+)\s*[-－]\s*(\d+)\s*',text,re.I)
         return tuple(map(int,match.groups())) if match else None
 
     def select_stage(self, number=None):
         v = self.v
+        previous=None
         for _ in range(10):
             v.scan()
+            fingerprint=np.asarray(v.image.crop((400,260,1030,1670)).resize((64,64)),dtype=float)
+            if previous is not None and np.mean(np.abs(fingerprint-previous))<1.5:
+                return False
+            previous=fingerprint
             candidates = []
             if self.layout=='wisdom' and number is not None:
                 # Whole-screen detection truncates the leading digits on this
@@ -166,7 +198,8 @@ class EventActivities:
                 for row in v.items:
                     if re.fullmatch(r'Event',row['text'],re.I):
                         x,y,w,h=row['box'];key=(0,round(y))
-                        if 250<y<1700 and key not in getattr(self,'checked_stages',set()):
+                        if (250<y<1700 and key not in getattr(self,'checked_stages',set())
+                                and not self.sphere_row_cleared(y+h/2)):
                             candidates.append((key,row))
             for item in v.items:
                 parsed = self.stage_number(item['text'])
@@ -177,6 +210,8 @@ class EventActivities:
                     continue
                 if number is None and parsed in getattr(self,'checked_stages',set()):
                     continue
+                if number is None and self.layout=='sphere' and self.sphere_row_cleared(y+h/2):
+                    continue
                 if number is not None and parsed[1] != number:
                     continue
                 if number is None and v.find('clear|CLEAR|REPEAT|已通关|锁定|Access\s*Denied',
@@ -186,7 +221,7 @@ class EventActivities:
             if candidates:
                 selected,item = sorted(candidates,key=lambda pair:pair[0])[0]
                 x,y,w,h = item['box']
-                v.tap(x+w/2,y+h/2 if self.layout=="wisdom" or re.match(r"Event",item["text"],re.I) else max(260,y-95))
+                v.tap(x+w/2,y+h/2)
                 v.expect('关卡信息|进入战斗|故事')
                 if number is None:
                     self.checked_stages=getattr(self,'checked_stages',set())|{selected}
@@ -208,6 +243,16 @@ class EventActivities:
             v.wait(1.5)
         return False
 
+    def sphere_row_cleared(self, y):
+        # Ornate pale stage numbers and CLEAR labels are often omitted by
+        # full-frame detection. Re-read the observed left-hand row badge.
+        from maa.pipeline import JOCR
+        crop=self.v.image.crop((440,max(0,int(y)-70),600,min(1920,int(y)+90))).resize((480,480))
+        result=self.v.t.post_recognition('OCR',JOCR(expected=['clear'],threshold=.6),
+                                        np.asarray(crop)[:,:,::-1].copy()).wait().get()
+        return bool(result and any(re.search('clear',item.text,re.I)
+                    for node in result.nodes if node.recognition for item in node.recognition.filtered_results))
+
     def story(self):
         v = self.v
         self.home(); v.scan()
@@ -225,7 +270,7 @@ class EventActivities:
             if second and self.enabled(second):
                 self.open_story_part('II')
                 v.scan()
-                if v.find(r'0\s*[/／]\s*5',(500,90,500,220)):
+                if v.find(r'[0OoＯ]\s*[/／]\s*5',(700,90,380,180)):
                     v.e.log('STORY II 门票已用完，保留新关卡优先策略至下次重置')
                     self.home();return
                 self.checked_stages=set()
@@ -239,7 +284,7 @@ class EventActivities:
             if not self.open_story_part(self.option('story_part','I')):
                 return
         v.scan()
-        if v.find(r'0\s*[/／]\s*5',(700,420,380,180) if self.layout=='wisdom' else (500,90,350,140)):
+        if v.find(r'[0OoＯ]\s*[/／]\s*5',(700,420,380,180) if self.layout=='wisdom' else (700,90,380,180)):
             v.e.log('活动 STORY 门票已用完，跳过'); self.home(); return
         farm = self.option('story_mode','快速战斗')=='快速战斗'
         number = int(self.option('farm_stage',11)) if farm else None
@@ -265,6 +310,8 @@ class EventActivities:
             v.expect('点击任意处进行下一步',timeout=40)
             v.click_text('点击任意处进行下一步')
             v.expect('活动关卡',(0,0,300,170))
+            v.expect(r'[0OoＯ]\s*[/／]\s*5',(700,420,380,180) if self.layout=='wisdom' else (700,90,380,180),timeout=15)
+            self.save_evidence('story-tickets-used')
             v.e.log('活动 STORY 快速战斗已完成')
         else:
             EventPush(v).run()
@@ -288,13 +335,45 @@ class EventActivities:
             v.expect('活动关卡',(0,0,300,170))
         return True
 
+    def challenge_remaining(self):
+        v=self.v
+        if not v.find('挑战关卡',(0,0,300,170)):
+            return None
+        item=v.find(r'[01OoＯ]\s*[/／]\s*[1Il丨]',(870,480,210,150))
+        if item:
+            return 0 if re.match(r'[0OoＯ]',item['text'].strip()) else 1
+        # The denominator can be read as ')' in full-frame recognition.
+        # Read the original counter pixels again rather than guessing from
+        # the disabled battle button.
+        from maa.pipeline import JOCR
+        crop=v.image.crop((1000,545,1075,600)).resize((450,330))
+        result=v.t.post_recognition('OCR',JOCR(expected=[r'^[01]\s*[/／]\s*1$'],
+            only_rec=True,threshold=.3),np.asarray(crop)[:,:,::-1].copy()).wait().get()
+        for node in result.nodes if result else []:
+            if not node.recognition:continue
+            for item in node.recognition.filtered_results:
+                match=re.fullmatch(r'([01])\s*[/／]\s*1',item.text.strip())
+                if match:return int(match[1])
+        return None
+
+    def expect_challenge_used(self,timeout=20):
+        v=self.v;deadline=time.monotonic()+timeout
+        while time.monotonic()<deadline:
+            v.scan()
+            if self.challenge_remaining()==0:
+                self.save_evidence('challenge-used')
+                return
+            v.wait(1)
+        raise RuntimeError('未核实活动挑战剩余0/1')
+
     def challenge(self):
         v = self.v
         self.open_menu('^挑战$','挑战关卡')
         v.expect('CHALLENGE\\s*STAGE|WARNING|CLEAR\\s*STAGE|[/／]',
                  (0,400,1080,1250),timeout=20)
         v.scan()
-        if v.find(r'[0OoＯ]\s*[/／]\s*[1Il丨]',(870,480,210,150)):
+        if self.challenge_remaining()==0:
+            self.save_evidence('challenge-used')
             v.e.log('活动挑战次数已用完，跳过'); self.home(); return
         rows = [item for item in v.items if re.search('CHALLENGE\s*STAGE|WARNING',item['text'],re.I)]
         if self.layout=='wisdom':
@@ -314,12 +393,18 @@ class EventActivities:
             return
         start = v.find('进入战斗',(500,1690,580,180))
         if start and not self.enabled(start):
-            v.e.log('活动挑战开战按钮为灰色，跳过并继续领取任务')
+            v.tap(1050,1000);v.scan()
+            self.expect_challenge_used(timeout=15)
+            v.e.log('已核实活动挑战剩余0/1，继续领取任务')
             self.home()
             return
         if not v.battle('挑战关卡',limit=240):
             self.home(); return
-        v.e.log('活动挑战战斗已结束'); self.home()
+        v.scan()
+        if v.find('关卡信息') and v.find('进入战斗'):
+            v.tap(1050,1000);v.scan()
+        self.expect_challenge_used(timeout=20)
+        v.e.log('活动挑战已结算，核实剩余0/1'); self.home()
 
     def missions(self):
         v = self.v
@@ -336,10 +421,18 @@ class EventActivities:
             v.scan()
             if not v.click_text('^'+tab+'$',(50,250,930,220)):
                 raise RuntimeError('未识别活动任务分类：'+tab)
-            self.claim_missions(tab)
+            outcome=self.claim_missions(tab)
+            if outcome=='needs_minigame':
+                self.home()
+                BubbleMarch(v).run()
+                self.home()
+                v.click_text('^任务$',(880,250,200,330))
+                v.expect('每日任务')
+                v.click_text('^每日任务$',(50,250,930,220))
+                self.claim_missions(tab,allow_minigame=False)
         self.home()
 
-    def claim_missions(self,tab):
+    def claim_missions(self,tab,allow_minigame=True):
         v=self.v
         v.expect('全部领取',(550,1600,500,250),timeout=20)
         for _ in range(20):
@@ -348,6 +441,17 @@ class EventActivities:
             if not item:
                 raise RuntimeError('未识别活动任务领取状态')
             if not self.enabled(item):
+                if tab=='每日任务':
+                    if not (v.find('已完成所有任务') or v.find(r'100\s*[/／]\s*100',(80,650,300,160))):
+                        mini=v.find(r'游玩1次.*BUBBLE\s*MARCH')
+                        if self.layout=='sphere' and allow_minigame and mini:
+                            _,y,_,h=mini['box']
+                            if v.find(r'0\s*[/／]\s*1',(630,y-50,170,h+100)):
+                                v.e.log('活动每日任务仍缺小游戏参与，补做免费普通关卡一局')
+                                return 'needs_minigame'
+                        raise RuntimeError('活动每日积分未确认100/100，不标记每日任务完成')
+                    self.save_evidence('daily-completed')
+                    v.e.log('已核实活动每日任务100/100及奖励领取状态')
                 v.e.log('活动'+tab+'奖励已领完')
                 return
             x,y,w,h=item['box'];v.tap(x+w/2,y+h/2)
@@ -367,6 +471,15 @@ class EventActivities:
         v.expect('点击任意处进行下一步',timeout=40)
         v.click_text('点击任意处进行下一步')
         v.expect('挑战关卡',(0,0,300,170),timeout=25)
+        self.expect_challenge_used(timeout=15)
+
+    def save_evidence(self, name):
+        import json
+        from portable import ROOT
+        folder=ROOT/'validation';folder.mkdir(exist_ok=True)
+        path=folder/f'{self.layout}-{name}'
+        self.v.image.save(path.with_suffix('.png'))
+        path.with_suffix('.json').write_text(json.dumps(self.v.items,ensure_ascii=False,indent=2),encoding='utf-8')
 
     def set_quick_count(self):
         v=self.v
@@ -378,7 +491,8 @@ class EventActivities:
         v.click_text('^MAX$',(650,1280,250,150));v.scan()
 
     def run(self):
-        self.home()
+        if self.home() is False:
+            return 'skipped'
         skipped = []
         for key,method,timeout in [('signin',self.signin,90),('story',self.story,900),
                                    ('challenge',self.challenge,300),('missions',self.missions,150)]:
@@ -407,7 +521,7 @@ class EventActivities:
                     self.v.e.log('已恢复活动首页，继续下一项')
         self.v.e.log('活动日常流程结束，已返回活动首页'+
                      ('；未完成步骤：'+', '.join(skipped) if skipped else ''))
-        return 'skipped' if skipped else None
+        return 'partial' if skipped else None
 
 
 class EventPush:
@@ -493,3 +607,126 @@ class EventPush:
                 raise RuntimeError('未识别到后续活动页面，推图停止，请保留当前画面用于适配')
             v.wait(2)
         raise RuntimeError('活动推图超过二十分钟，已停止')
+
+
+class BubbleMarch:
+    """Complete the free daily participation task, then restore portrait mode."""
+    def __init__(self, vision):
+        self.v=vision
+        self.items=[]
+        self.size=(1920,1080)
+
+    def scan(self):
+        import io
+        from PIL import Image
+        from maa.pipeline import JOCR
+        frame=Image.open(io.BytesIO(self.v.e.screenshot())).convert('RGB')
+        self.size=frame.size
+        if frame.width<frame.height:return False
+        if abs(frame.width/frame.height-16/9)>.05:
+            raise RuntimeError('小游戏画面比例变化')
+        frame=frame.resize((1920,1080))
+        result=self.v.t.post_recognition('OCR',JOCR(expected=['.*']),
+                    np.asarray(frame)[:,:,::-1].copy()).wait().get()
+        self.items=[{'text':i.text,'box':list(i.box)} for n in result.nodes if n.recognition
+                    for i in n.recognition.filtered_results] if result else []
+        return True
+
+    def find(self, pattern, roi=(0,0,1920,1080)):
+        x,y,w,h=roi
+        return next((i for i in self.items if re.search(pattern,i['text'],re.I)
+            and x<=i['box'][0]+i['box'][2]/2<=x+w
+            and y<=i['box'][1]+i['box'][3]/2<=y+h),None)
+
+    def tap(self,x,y):
+        from engine import adb_run
+        w,h=self.size
+        adb_run(self.v.e.adb,self.v.e.serial,'shell','input','tap',
+                str(round(x*w/1920)),str(round(y*h/1080)))
+        self.v.wait(2)
+
+    def click(self,item):
+        x,y,w,h=item['box'];self.tap(x+w/2,y+h/2)
+
+    def leave(self):
+        deadline=time.monotonic()+90
+        while time.monotonic()<deadline:
+            if not self.scan():
+                self.v.wait(3)
+                self.v.expect('活动地区',(0,0,300,180),timeout=35)
+                # Reconnect after rotation so subsequent controller clicks use
+                # the restored portrait geometry rather than landscape state.
+                self.v.e.connect(self.v.e.adb,self.v.e.serial)
+                if not self.v.t.bind(self.v.r,self.v.e.controller):
+                    raise RuntimeError('小游戏退出后控制器重建失败')
+                self.v.e.log('小游戏已退出并恢复竖屏活动页面')
+                return
+            if self.find('确定要退出小游戏'):
+                button=self.find('^确认$',(950,620,420,180))
+                if button:self.click(button)
+            elif self.find('^NORMAL$') or self.find('^START$'):
+                self.tap(45,50)
+            elif self.find('DEFEAT|VICTORY') and self.find('^离开$'):
+                self.click(self.find('^离开$'))
+            else:
+                self.v.wait(2)
+        raise RuntimeError('小游戏退出后未确认竖屏页面')
+
+    def run(self):
+        v=self.v
+        entered=False;settled=False;selected=False
+        # The shortcut can enter directly when the player is already beside
+        # the NPC. Check orientation before using portrait-only recognition.
+        if self.scan():
+            entered=True
+        else:
+            v.home()
+            EventActivities(v).home()
+            if not v.click_text('^小游戏$',(550,1300,530,250)):
+                raise RuntimeError('小游戏入口未识别')
+            from engine import adb_run
+            import io
+            from PIL import Image
+            clicked=False
+            entry_deadline=time.monotonic()+40
+            while time.monotonic()<entry_deadline:
+                if self.scan():
+                    entered=True;break
+                try:
+                    v.scan()
+                except RuntimeError as error:
+                    if '竖屏 9:16' in str(error):continue
+                    raise
+                entry=v.find('^小游戏$',(0,100,1080,1100))
+                if not clicked and entry and v.find('水滴娃娃',(0,100,1080,1100)):
+                    x,y,w,h=entry['box']
+                    frame=Image.open(io.BytesIO(v.e.screenshot()))
+                    if frame.width>frame.height:continue
+                    adb_run(v.e.adb,v.e.serial,'shell','input','tap',
+                        str(round((x+w/2)*frame.width/1080)),str(round((y-100)*frame.height/1920)))
+                    clicked=True
+                v.wait(1)
+            if not entered:raise RuntimeError('小游戏未确认进入横屏页面')
+        deadline=time.monotonic()+450
+        try:
+            while time.monotonic()<deadline:
+                if not self.scan():
+                    v.wait(2);continue
+                entered=True
+                result=self.find('DEFEAT|VICTORY')
+                leave=self.find('^离开$',(550,800,500,230))
+                if result and leave:
+                    v.e.log('小游戏一局已结算：'+result['text']+'，核对每日参与任务')
+                    self.click(leave);settled=True;break
+                start=self.find('^START$',(700,700,550,260))
+                if start:self.click(start);continue
+                normal=self.find(r'^普通\s*[-－]\s*1$',(350,430,300,160))
+                if self.find('^NORMAL$') and normal:
+                    self.click(normal);selected=True;continue
+                battle=self.find('^进入战斗$',(1000,650,550,210))
+                if selected and battle and self.find('一般关卡'):
+                    self.click(battle);selected=False;continue
+                v.wait(2)
+            if not settled:raise RuntimeError('小游戏一局未确认结算')
+        finally:
+            if entered:self.leave()

@@ -3,7 +3,9 @@ import json
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 from portable import ROOT
+from common_popups import with_common_popups
 
 from maa.controller import AdbController
 from maa.context import ContextEventSink
@@ -14,6 +16,36 @@ from maa.toolkit import Toolkit
 from maa.define import MaaAdbInputMethodEnum, MaaAdbScreencapMethodEnum
 
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+
+
+@contextmanager
+def exclusive_device(serial):
+    """One task queue per device across GUI and validation processes."""
+    import ctypes
+    import hashlib
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel.CreateMutexW.restype = wintypes.HANDLE
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel.WaitForSingleObject.restype = wintypes.DWORD
+    kernel.ReleaseMutex.argtypes = [wintypes.HANDLE]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    name = 'Local\\NikkeAssistant-' + hashlib.sha256(serial.encode()).hexdigest()[:24]
+    handle = kernel.CreateMutexW(None, False, name)
+    if not handle:
+        raise RuntimeError('无法建立设备任务保护')
+    acquired = False
+    try:
+        status = kernel.WaitForSingleObject(handle, 0)
+        acquired = status in (0, 0x80)
+        if not acquired:
+            raise RuntimeError('这个设备已有任务正在运行，请先停止另一个流程')
+        yield
+    finally:
+        if acquired:
+            kernel.ReleaseMutex(handle)
+        kernel.CloseHandle(handle)
 
 
 def adb_run(adb, serial, *args):
@@ -59,7 +91,8 @@ class ProgressSink(ContextEventSink):
 
     def on_node_pipeline_node(self, context, noti_type, detail):
         if noti_type == NotificationType.Succeeded:
-            self.log(self.labels.get(detail.name, detail.name))
+            self.log(self.labels.get(detail.name, '统一关闭奖励弹窗，继续当前任务'
+                                     if detail.name == 'CommonRewardDismiss' else detail.name))
 
 
 class Engine:
@@ -141,6 +174,10 @@ class Engine:
     def run(self, tasks):
         if not self.controller:
             raise RuntimeError('请先连接模拟器')
+        with exclusive_device(self.serial):
+            return self._run_queue(tasks)
+
+    def _run_queue(self, tasks):
         # Claim global missions after all selected daily and event activities,
         # regardless of the caller's or a saved task file's original order.
         tasks = sorted(tasks, key=lambda task: -1 if task.get('handler')=='start_game'
@@ -174,7 +211,8 @@ class Engine:
                     raise RuntimeError('当前前台不是国服游戏')
                 from daily import Daily
                 try:
-                    Daily(self).dismiss_startup_popups()
+                    if task.get('handler') != 'event_supplies':
+                        Daily(self).dismiss_startup_popups()
                     if task.get('pipeline'):
                         Daily(self).home()
                 except InterruptedError:
@@ -210,6 +248,10 @@ class Engine:
                         raise RuntimeError(f'恢复大厅失败，停止队列：{recovery}') from exc
                     self.log('已确认恢复大厅，跳过失败任务并继续下一项')
                     continue
+                if outcome == 'partial':
+                    failed_tasks.append(task['name'])
+                    self.log(f"失败：{task['name']}；部分步骤未完成，已恢复页面，继续下一项")
+                    continue
                 self.log(f"{'跳过' if outcome=='skipped' else '完成'}：{task['name']}")
                 continue
             steps = task.get('steps', [])
@@ -222,6 +264,7 @@ class Engine:
             else:
                 pipeline = compile_steps(steps)
                 entry = 'Entry'
+            pipeline = with_common_popups(pipeline)
             # 内置任务限竖屏 9:16，避免在其他设备方向错误点击。
             if task.get('aspect'):
                 from PIL import Image
@@ -273,6 +316,11 @@ class Engine:
             last = tasker.get_latest_node(terminal)
             if last is None or not last.completed:
                 raise RuntimeError('任务缺少已通过的最终画面检查，队列停止')
+            if task.get('pipeline') and task.get('package') == 'com.tencent.nikke':
+                # OCR may see the dimmed lobby behind a modal. Recover and
+                # verify its bright navigation before advancing the queue.
+                from daily import Daily
+                Daily(self).home()
             self.log('已通过最终画面检查')
             tasker.clear_context_sinks()
             self.log(f"完成：{task['name']}")

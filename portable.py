@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
-VERSION = '0.3.37'
+VERSION = '0.3.37-local.7'
 
 
 def decode_console(data):
@@ -91,3 +91,4 @@ def discover_adb(preferred=''):
     except ImportError:
         pass
     return shutil.which('adb') or ''
+
