@@ -66,7 +66,7 @@ class ResourceTests(unittest.TestCase):
             self.assertEqual(graph['Entry'].get('action', 'DoNothing'), 'DoNothing')
             for name, node in graph.items():
                 for target in node.get('next', []):
-                    self.assertIn(target, graph)
+                    self.assertIn(target.removeprefix('[JumpBack]'), {**json.loads((ROOT/'resource/pipeline/common_popups.json').read_text(encoding='utf-8')), **graph})
                 if not node.get('next'):
                     self.assertEqual(name, 'Done')
                     self.assertEqual(node['action'], 'DoNothing')

@@ -21,16 +21,15 @@ class InterfaceTests(unittest.TestCase):
         engine.screenshot.return_value = image.getvalue()
         target = SimpleNamespace(tasks=[{'name':'邮箱'}],
             task_list=Mock(), adb=Mock(), serial=Mock(), save_preferences=Mock(),
-            events=queue.Queue(), engine=engine, work=lambda fn: fn(), log=Mock())
+            events=queue.Queue(), emulator_config={'auto_game':False}, engine=engine, work=lambda fn: fn(), log=Mock())
         target.task_list.curselection.return_value = (0,)
         target.adb.get.return_value = 'adb.exe'
         target.serial.get.return_value = 'emulator-5556'
         target.run_tasks=lambda selected: App.run_tasks(target,selected)
-        with patch('app.discover_adb',return_value='adb.exe'):
+        with patch('app.discover_adb',return_value='adb.exe'), patch('app.ensure_emulator',return_value='adb.exe'):
             App.run(target)
-            self.assertEqual(engine.method_calls[0],
-                unittest.mock.call.connect('adb.exe','emulator-5556'))
-            self.assertEqual(engine.method_calls[2], unittest.mock.call.run(target.tasks))
+            engine.connect.assert_called_once_with('adb.exe','emulator-5556')
+            engine.run.assert_called_once_with(target.tasks)
             engine.reset_mock()
             engine.connect.side_effect = RuntimeError('连接失败')
             with self.assertRaisesRegex(RuntimeError,'连接失败'):

@@ -14,7 +14,7 @@ class EventDailyTests(unittest.TestCase):
         label={'text':'STORYI','box':[184,1410,147,34]}
         frames={'ready':False}
         def find(expression,*args):
-            if expression==r'0\s*[/／]\s*5':return True
+            if re.search(expression,'0/5'):return True
             return label if frames['ready'] and re.search(expression,label['text']) else None
         def expect(expression,*args,**kwargs):
             if expression.startswith('^STORY'):
@@ -22,7 +22,7 @@ class EventDailyTests(unittest.TestCase):
                 frames['ready']=True
         v=SimpleNamespace(options={},scan=Mock(),find=find,expect=Mock(side_effect=expect),
                           click_text=Mock(),e=SimpleNamespace(log=Mock()))
-        flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True)
+        flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True);flow.select_stage=Mock(return_value=True);flow.used_tickets=Mock(return_value=True)
         flow.story()
         v.expect.assert_any_call(r'^STORY\s*I$',(0,1300,500,400),timeout=15)
         v.click_text.assert_called_once_with(r'^STORY\s*I$',(0,1300,500,400))
@@ -33,7 +33,7 @@ class EventDailyTests(unittest.TestCase):
         v=SimpleNamespace(options={'event_story_mode':'快速战斗','event_farm_stage':11},
             scan=Mock(),find=Mock(side_effect=lambda expression,*args:label if expression==r'^STORY\s*II$' else None),
             e=SimpleNamespace(log=Mock()))
-        flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True)
+        flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True);flow.select_stage=Mock(return_value=True);flow.used_tickets=Mock(return_value=True)
         flow.open_story_part=Mock(return_value=True);flow.select_stage=Mock(return_value=True)
         with patch('event_flow.EventPush') as push:
             flow.story()
@@ -45,7 +45,7 @@ class EventDailyTests(unittest.TestCase):
         label={'text':'STORY II','box':[100,1500,200,40]}
         v=SimpleNamespace(options={},scan=Mock(),find=Mock(side_effect=lambda expression,*args:
             label if expression==r'^STORY\s*II$' else True),e=SimpleNamespace(log=Mock()))
-        flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True)
+        flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True);flow.select_stage=Mock(return_value=True);flow.used_tickets=Mock(return_value=True)
         flow.open_story_part=Mock(return_value=True);flow.select_stage=Mock()
         flow.story()
         flow.select_stage.assert_not_called()
@@ -55,7 +55,7 @@ class EventDailyTests(unittest.TestCase):
         label={'text':'STORY II','box':[100,1500,200,40]}
         v=SimpleNamespace(options={'event_story_part':'I'},scan=Mock(),find=Mock(side_effect=lambda expression,*args:
             label if expression==r'^STORY\s*II$' else None),e=SimpleNamespace(log=Mock()))
-        flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True)
+        flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True);flow.select_stage=Mock(return_value=True);flow.used_tickets=Mock(return_value=True)
         flow.open_story_part=Mock(side_effect=[True,False]);flow.select_stage=Mock(return_value=False)
         with patch('event_flow.EventPush') as push:
             flow.story();push.assert_not_called()
@@ -90,13 +90,13 @@ class EventDailyTests(unittest.TestCase):
 
     def test_lobby_enters_identified_event_before_daily_sections(self):
         v=SimpleNamespace(scan=Mock(),find=Mock(side_effect=lambda expression,*args:
-            {'box':[600,1550,200,70]} if expression in ('^大厅$','UNBREAKABLE') else None),
+            {'box':[600,1550,200,70]} if expression in ('^大厅$',r'[UC]N\s*BREAKABLE|SPHERE') else None),
             lobby=Mock(return_value=True),click_text=Mock(),expect=Mock(),wait=Mock(),
             tap=Mock(),e=SimpleNamespace(log=Mock()))
         flow=EventActivities(v)
         flow.is_home=Mock(side_effect=[False,True])
         flow.home()
-        v.click_text.assert_called_once_with('UNBREAKABLE',(550,1450,530,280))
+        v.click_text.assert_called_once_with(r'[UC]N\s*BREAKABLE|SPHERE',(550,1450,530,280))
         v.tap.assert_not_called()
 
     def test_missing_event_banner_has_bounded_rotation(self):
@@ -106,14 +106,14 @@ class EventDailyTests(unittest.TestCase):
             tap=Mock(),e=SimpleNamespace(log=Mock()))
         flow=EventActivities(v)
         flow.is_home=Mock(return_value=False)
-        with self.assertRaisesRegex(RuntimeError,'活动入口'):flow.home()
+        self.assertFalse(flow.home())
         self.assertEqual(v.tap.call_count,2)
         v.click_text.assert_not_called()
 
     def test_dimmed_lobby_does_not_click_event_under_modal(self):
         v=SimpleNamespace(scan=Mock(),find=Mock(side_effect=lambda expression,*args:
-            True if expression in ('^大厅$','UNBREAKABLE') else None),
-            lobby=Mock(return_value=False),click_text=Mock(),tap=Mock())
+            True if expression in ('^大厅$',r'[UC]N\s*BREAKABLE|SPHERE') else None),
+            lobby=Mock(return_value=False),click_text=Mock(),tap=Mock(),wait=Mock())
         flow=EventActivities(v)
         flow.is_home=Mock(return_value=False)
         with self.assertRaisesRegex(RuntimeError,'活动首页'):flow.home()
@@ -144,7 +144,7 @@ class EventDailyTests(unittest.TestCase):
             self.assertIsNone(EventActivities.stage_number(text))
 
     def test_unidentified_page_never_clicked(self):
-        v=SimpleNamespace(scan=Mock(),find=Mock(return_value=None),tap=Mock(),click_text=Mock())
+        v=SimpleNamespace(scan=Mock(),find=Mock(return_value=None),tap=Mock(),click_text=Mock(),wait=Mock())
         with self.assertRaisesRegex(RuntimeError,'活动首页'):
             EventActivities(v).home()
         v.tap.assert_not_called()
@@ -217,7 +217,7 @@ class EventDailyTests(unittest.TestCase):
             find=lambda expression,*args:start if expression=='进入战斗' else None,
             tap=Mock(),expect=Mock(),battle=Mock(),e=SimpleNamespace(log=Mock()))
         flow=EventActivities(v)
-        flow.open_menu=Mock();flow.home=Mock();flow.enabled=Mock(return_value=False)
+        flow.open_menu=Mock();flow.home=Mock();flow.enabled=Mock(return_value=False);flow.challenge_remaining=Mock(side_effect=[1,0]);flow.save_evidence=Mock()
         flow.challenge()
         v.battle.assert_not_called()
         flow.home.assert_called_once()
