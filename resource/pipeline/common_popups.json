@@ -126,5 +126,60 @@
     "post_delay": 1500,
     "max_hit": 8,
     "next": []
+  },
+  "CommonTextCloseDismiss": {
+    "recognition": "OCR",
+    "expected": [
+      "^\\s*点击\\s*(?:任意处\\s*)?关闭\\s*(?:画面|页面)?\\s*[。.]?\\s*$"
+    ],
+    "roi": [
+      60,
+      1000,
+      620,
+      270
+    ],
+    "threshold": 0.55,
+    "action": "Click",
+    "target": true,
+    "post_delay": 1500,
+    "max_hit": 8,
+    "next": []
+  },
+  "CommonCloseConfirmDismiss": {
+    "recognition": "And",
+    "all_of": [
+      {
+        "recognition": "OCR",
+        "expected": [
+          "关闭窗口后.*商品.*移至.*礼包商店"
+        ],
+        "roi": [
+          50,
+          460,
+          640,
+          270
+        ],
+        "threshold": 0.55
+      },
+      {
+        "recognition": "OCR",
+        "expected": [
+          "^确认$"
+        ],
+        "roi": [
+          370,
+          700,
+          320,
+          270
+        ],
+        "threshold": 0.55
+      }
+    ],
+    "box_index": 1,
+    "action": "Click",
+    "target": true,
+    "post_delay": 1500,
+    "max_hit": 8,
+    "next": []
   }
 }
