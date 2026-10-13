@@ -35,6 +35,9 @@ class Replay:
     def colorful_button(self, item):
         return True
 
+    def lobby(self):
+        return False
+
 
 class EventTests(unittest.TestCase):
     def test_disabled_stage_button_skips_without_input(self):
@@ -43,11 +46,24 @@ class EventTests(unittest.TestCase):
         self.assertEqual(EventPush(v).run(),'skipped')
         self.assertEqual(v.actions,[])
 
-    def test_lobby_never_clicked(self):
+    def test_unconfirmed_lobby_never_clicked(self):
         v = Replay([['大厅','作战出击']])
         with self.assertRaisesRegex(RuntimeError,'请选择|请先进入'):
             EventPush(v).run()
         self.assertEqual(v.actions,[])
+
+    def test_confirmed_lobby_routes_to_new_stages_and_restores_options(self):
+        from unittest.mock import patch
+        v=Replay([['大厅']]);v.lobby=lambda:True;v.home=Mock()
+        original=v.options
+        def story():
+            self.assertEqual(v.options['event_story_mode'],'推图')
+        with patch('event_flow.EventActivities') as activities:
+            activities.return_value.story.side_effect=story
+            EventPush(v).run()
+            activities.return_value.story.assert_called_once()
+        self.assertIs(v.options,original)
+        v.home.assert_called_once()
 
     def test_stops_after_one_stage_without_starting_next(self):
         v = Replay([['1-1','战斗开始'],['1-1','战斗开始'],
