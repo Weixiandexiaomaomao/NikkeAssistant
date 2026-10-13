@@ -151,6 +151,26 @@
     "aspect": 0.5625
   },
   {
+    "id": "cn_special_arena",
+    "name": "特殊竞技场免费挑战",
+    "handler": "special_arena",
+    "status": "免费战斗与次数核对已实测",
+    "default": true,
+    "description": "沿用当前三队，默认挑战第三个对手；核对每日免费次数和免费按钮，每场结算后核对次数减少，不购买次数。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
+    "id": "cn_champion",
+    "name": "冠军竞技场应援",
+    "handler": "champion",
+    "status": "晋级赛应援已实测",
+    "default": true,
+    "description": "进入当前开放应援的赛段，选择应援比例较高的一方，提交后核实参赛者CHEER标记；已应援时不重复提交，未开放时跳过。",
+    "package": "com.tencent.nikke",
+    "aspect": 0.5625
+  },
+  {
     "id": "cn_arena_reward",
     "name": "特殊竞技场奖励",
     "handler": "arena_reward",

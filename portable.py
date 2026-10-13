@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
-VERSION = '0.3.37-local.11'
+VERSION = '0.3.37-local.12'
 
 
 def decode_console(data):

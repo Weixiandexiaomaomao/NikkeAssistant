@@ -155,6 +155,11 @@ class Daily:
             return None
         if not dismiss_navigation and self.find('关卡信息'):
             return None
+        if not dismiss_navigation and getattr(self,'active_handler',None)=='special_arena' and (
+                self.find('快速战斗') and self.find('进入战斗',(450,1450,600,350))):
+            return None
+        if not dismiss_navigation and getattr(self,'active_handler',None)=='champion' and self.find('应援现状'):
+            return None
         if not dismiss_navigation and self.find('^(?:活动关卡|新人竞技场|无限之塔|方舟)$',(0,0,350,170)):
             return None
         pass_ad=(getattr(self,'active_handler',None)!='missions'
@@ -1041,6 +1046,108 @@ class Daily:
         else:
             self.tap(980, 320)
 
+    def special_free_count(self):
+        item=self.find(r'每日免费次数\s*[0-9]+\s*[/／]\s*[0-9]+',(700,800,380,220))
+        if not item:
+            raise RuntimeError('特殊竞技场每日免费次数未确认')
+        return int(re.search(r'([0-9]+)\s*[/／]',item['text'])[1])
+
+    def special_arena(self):
+        self.ark((790,1190),'^竞技场$')
+        remaining=self.special_free_count()
+        position=int(self.options.get('special_arena_opponent',3))
+        if position not in (1,2,3):raise RuntimeError('特殊竞技场对手必须为第1、2或3个')
+        if remaining==0:
+            self.e.log('已核实特殊竞技场每日免费次数0，结束')
+            return
+        for _ in range(min(remaining,5)):
+            if not self.click_text('^特殊竞技场$',(500,950,500,200)):
+                raise RuntimeError('特殊竞技场入口未识别')
+            self.expect('^特殊竞技场$',(0,0,320,160))
+            self.wait_rookie_list()
+            buttons=sorted([i for i in self.items if i['text']=='进入战斗'
+                            and 760<i['box'][0]+i['box'][2]/2<1050
+                            and 900<i['box'][1]<1800],key=lambda i:i['box'][1])
+            if len(buttons)!=3:raise RuntimeError('特殊竞技场对手列表未确认')
+            button=buttons[position-1];x,y,w,h=button['box']
+            free=self.find('^免费$',(760,y-110,290,110))
+            if not free or not self.blue(free['box'][0]+free['box'][2]/2,free['box'][1]+free['box'][3]/2):
+                raise RuntimeError('所选特殊竞技场对手没有免费标记，不发起付费挑战')
+            self.e.log(f'特殊竞技场免费挑战第{position}个对手，剩余{remaining}次')
+            self.tap(x+w/2,y+h/2,2)
+            self.expect('快速战斗',(80,1450,450,300))
+            if not self.battle('^特殊竞技场$',allow_defeat=True):
+                raise RuntimeError('特殊竞技场战斗未确认结算')
+            self.wait_rookie_list()
+            if not self.click_text('^返回$',(0,1750,300,170)):
+                raise RuntimeError('特殊竞技场结算后返回入口未识别')
+            self.expect('^竞技场$',(0,0,320,160))
+            after=self.special_free_count()
+            if after!=remaining-1:
+                raise RuntimeError('特殊竞技场免费次数未减少一次，不重复挑战')
+            remaining=after
+            self.e.log(f'已核实特殊竞技场免费次数减少，剩余{remaining}次')
+            if not remaining:return
+        if remaining:raise RuntimeError('特殊竞技场仍有免费次数，尚未完成')
+
+    def cheer_choice(self):
+        sides=[]
+        for roi in ((80,650,420,430),(580,650,430,430)):
+            item=self.find(r'[0-9]+\s*[.．]\s*[0-9]+\s*[%％]',roi)
+            if not item:return None
+            match=re.search(r'([0-9]+)\s*[.．]\s*([0-9]+)\s*[%％]',item['text'])
+            value=float(match[1]+'.'+match[2])
+            if not 0<=value<=100:return None
+            sides.append(value)
+        if abs(sum(sides)-100)>1:return None
+        return (0 if sides[0]>=sides[1] else 1),sides
+
+    def submit_cheer(self):
+        if not self.find('应援现状') or not self.find('选择后仍可变更应援对象'):
+            raise RuntimeError('应援选择窗口未确认')
+        choice=self.cheer_choice()
+        if choice is None:raise RuntimeError('双方应援比例未识别，不猜测应援对象')
+        side,shares=choice
+        roi=(100 if side==0 else 580,900,420,200)
+        if not self.find('^选择中$',roi):
+            if not self.click_text('^选择$',roi):raise RuntimeError('应援对象选择按钮未识别')
+            self.expect('^选择中$',roi)
+        self.e.log(f'选择应援比例较高的一方：{shares[side]:.2f}%')
+        if not self.click_text('^应援$',(560,1550,460,190),blue=True):
+            raise RuntimeError('应援提交按钮未启用')
+        deadline=time.monotonic()+25
+        while time.monotonic()<deadline:
+            self.scan()
+            if not self.find('应援现状') and self.find('CHEER',(300,900,500,500)):
+                self.e.log('已核实应援提交成功，参赛者出现CHEER标记')
+                return
+            self.wait(1)
+        raise RuntimeError('应援提交后未确认参赛者CHEER标记')
+
+    def champion(self):
+        self.ark((790,1190),'^竞技场$')
+        if not self.click_text('^冠军竞技场$',(100,1300,700,240)):
+            raise RuntimeError('冠军竞技场入口未识别')
+        self.expect('冠军竞技场',(0,0,350,160))
+        self.expect('^小组循环赛$',(0,700,400,400))
+        self.expect('^冠军争[夺霸]赛$',(700,700,380,400))
+        self.wait(1);self.scan()
+        # The phase menu labels the active, time-limited phase with 应援.
+        action=self.find('^应援$',(60,1250,970,350))
+        if not action:
+            self.e.log('冠军竞技场当前未开放应援，结束')
+            return 'skipped'
+        x,y,w,h=action['box'];self.tap(x+w/2,y+h/2,3)
+        self.expect('^(?:小组循环赛|晋级赛|冠军争[夺霸]赛)$',(0,0,350,160))
+        self.expect('^应援$',(250,1600,600,180))
+        if self.find('CHEER',(300,900,500,500)):
+            self.e.log('已核实本轮冠军竞技场已有参赛者CHEER标记，不重复应援')
+            return
+        if not self.click_text('^应援$',(250,1600,600,180)):
+            raise RuntimeError('冠军竞技场应援入口未识别')
+        self.expect('应援现状')
+        self.submit_cheer()
+
     def battle(self, return_page, limit=300, allow_defeat=False):
         deadline = time.monotonic() + limit
         entered = False
@@ -1051,15 +1158,16 @@ class Daily:
             if self.reward_dismissed:
                 entered = settled = True
             if self.find('失败|战斗失败|DEFEAT'):
-                if allow_defeat and self.find('ROOKIE.*ARENA',(200,450,700,300)):
+                if allow_defeat and (self.find('(?:ROOKIE|SPECIAL).*ARENA',(200,0,700,800))
+                        or return_page=='^特殊竞技场$'):
                     if not arena_defeat:
-                        self.e.log('竞技场本场落败，等待结算后继续剩余免费挑战')
+                        self.e.log('竞技场出现落败回合，等待完整结算后继续剩余免费挑战')
                     arena_defeat = entered = True
                 else:
                     self.click_text('返回|确认', (0, 1000, 1080, 850))
                     self.e.log('本次战斗失败，结束该任务')
                     return False
-            if self.click_text('点击领取奖励|点击.*继续|点击.*下一步', (0, 650, 1080, 1120)):
+            if self.click_text('点击领取奖励|点击.*继续|点击.*下一步', (0, 650, 1080, 1250)):
                 entered = True
                 settled = True
                 continue
@@ -1548,7 +1656,7 @@ class Daily:
                      if re.fullmatch('进入战斗',item['text'])
                      and 760<=item['box'][0]+item['box'][2]/2<=1050
                      and 900<=item['box'][1]+item['box'][3]/2<=1850]
-            if len(buttons)==3 and self.find('更新目录',(700,800,380,170)):
+            if len(buttons)==3 and self.find('更新目录',(700,800,380,350)):
                 # The title returns before the opponent list during result fade-out.
                 self.wait(1)
                 self.scan()

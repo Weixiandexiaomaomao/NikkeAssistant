@@ -146,7 +146,7 @@ class ModernUI:
 
     def visible_indices(self):
         if self.profile.get()=='日常战斗':
-            return [i for i,t in enumerate(self.tasks) if t.get('handler') in ('start_game','simulation','interception','tower','rookie','advise')]
+            return [i for i,t in enumerate(self.tasks) if t.get('handler') in ('start_game','simulation','interception','tower','rookie','special_arena','champion','advise')]
         if self.profile.get()=='活动任务': return [i for i,t in enumerate(self.tasks) if not t.get('id','').startswith('cn_')]
         return [i for i,t in enumerate(self.tasks)
                 if not t.get('handler','').startswith('event_') or t.get('handler') in ('event_daily','event_wisdom_daily','event_supplies')]
@@ -244,6 +244,11 @@ class ModernUI:
             self.option(self.settings_body,'最多开始关卡数','event_push_count',[1,3,5,12,24],12)
             self.option(self.settings_body,'跳过剧情','event_skip_story',['否','是'],'否')
             self.label(self.settings_body,'先手动进入活动，选择首个未通关关卡\n从准备页或战后下一关页面启动\n沿用当前队伍，需开启自动射击和爆裂\n不买门票；失败、锁定、票不足时停止\n活动地图选关尚未适配',12,MUTED,justify='left',wraplength=280).pack(anchor='w',pady=18)
+        elif kind=='special_arena':
+            self.option(self.settings_body,'挑战第几个对手','special_arena_opponent',[1,2,3],3)
+            self.label(self.settings_body,'沿用游戏当前三支队伍\n仅使用每日免费次数\n每场结算后核实次数减少\n失败结算后继续剩余免费挑战',12,MUTED,justify='left',wraplength=280).pack(anchor='w',pady=18)
+        elif kind=='champion':
+            self.label(self.settings_body,'检查当前开放应援的赛段\n选择应援比例较高的一方并提交\n确认参赛者出现 CHEER 标记\n本轮已应援时不重复操作',12,MUTED,justify='left',wraplength=280).pack(anchor='w',pady=18)
         elif kind in ('interception','tower','rookie'):
             maxcount=5 if kind=='rookie' else 3
             self.option(self.settings_body,'最多挑战次数',kind+'_count',range(1,maxcount+1),maxcount)
