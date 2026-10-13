@@ -33,7 +33,7 @@ class StartupTests(unittest.TestCase):
         launches=[call for call in calls if 'start' in call]
         self.assertEqual(len(launches),2)
         self.assertTrue(all('android.intent.category.LAUNCHER' in call for call in launches))
-        d.scan.assert_called_once_with()
+        d.scan.assert_called_once_with(dismiss_navigation=True)
 
     def test_loading_announcement_does_not_depend_on_checkbox_ocr(self):
         d = Daily.__new__(Daily)

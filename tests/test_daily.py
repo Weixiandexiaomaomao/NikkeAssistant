@@ -19,10 +19,11 @@ class DailyChecks(unittest.TestCase):
         self.assertEqual(d.scan()[0]['text'],'方舟')
         d.tap.assert_called_once_with(540,1790,delay=2)
 
-    def test_promotion_does_not_close_without_both_offer_and_close_prompt(self):
+    def test_promotion_needs_close_instruction_but_not_offer_wording(self):
         d=Daily.__new__(Daily);d.reward_generation=0
-        for items in ([{'text':'点击关闭画面。','box':[400,1770,280,40]}],
-                      [{'text':'从礼包中选择一个购买。','box':[220,940,650,40]}],
+        d.items=[{'text':'点击关闭画面。','box':[400,1770,280,40]}]
+        self.assertIsNotNone(d.promotion_close())
+        for items in ([{'text':'从礼包中选择一个购买。','box':[220,940,650,40]}],
                       [{'text':'每日免费礼包','box':[100,690,250,40]}]):
             d.items=items;self.assertIsNone(d.promotion_close())
 
@@ -87,7 +88,7 @@ class DailyChecks(unittest.TestCase):
             d.announcement_close.return_value=None;d.login_popup.return_value=None;d.supplies_close.return_value=None
             d.find.side_effect=[None,True];d.lobby.return_value=True
             e.start_game()
-        daily.assert_called_once_with(e);d.scan.assert_called_once_with();d.home.assert_called_once_with()
+            daily.assert_called_once_with(e);d.scan.assert_called_once_with(dismiss_navigation=True);d.home.assert_called_once_with()
 
     def test_bond_notifications_are_round_dots_in_the_requested_strip(self):
         d=Daily.__new__(Daily);d.reward_generation=0;d.image=Image.new('RGB',(1080,1920),'white')
@@ -240,7 +241,7 @@ class DailyChecks(unittest.TestCase):
         d=Daily.__new__(Daily);d.reward_generation=0;d.wait=Mock()
         frames=iter(['dialog','old_stock','refreshed'])
         state={}
-        d.scan=lambda:state.update(page=next(frames))
+        d.scan=lambda **kwargs:state.update(page=next(frames))
         def find(expression,*args):
             if expression=='普通商店':return True
             if expression=='是否更新商品':return state['page']=='dialog'
@@ -617,7 +618,7 @@ class DailyChecks(unittest.TestCase):
         d=self.announcement()
         frames=iter(['daily','reward','daily_done','transition','autumn','reward','autumn_done','lobby','lobby'])
         state={'page':None}
-        d.scan=lambda:state.update(page=next(frames))
+        d.scan=lambda **kwargs:state.update(page=next(frames))
         d.announcement_close=lambda:None
         claim={'box':[780,1780,135,50]}
         d.login_popup=lambda:(claim,(974,203)) if state['page'] in ('daily','daily_done','autumn','autumn_done') else None
