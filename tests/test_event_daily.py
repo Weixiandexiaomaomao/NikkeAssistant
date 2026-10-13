@@ -9,6 +9,17 @@ from event_flow import EventActivities
 
 
 class EventDailyTests(unittest.TestCase):
+    def test_locked_hard_rows_switch_observed_normal_tab(self):
+        import re
+        labels=[{'text':'STORY I','box':[100,1450,200,40]},
+                {'text':'CAccess Denied','box':[395,874,283,42]},
+                {'text':'orumal','box':[545,1848,124,34]}]
+        v=SimpleNamespace(find=lambda pattern,*args:next((x for x in labels if re.search(pattern,x['text'])),None),
+                          expect=Mock(),click_text=Mock(),wait=Mock(),scan=Mock(),e=SimpleNamespace(log=Mock()))
+        flow=EventActivities(v);flow.enabled=Mock(return_value=True)
+        self.assertTrue(flow.open_story_part('I'))
+        v.click_text.assert_any_call(r'(?i)^(?:normal|orumal)$',(350,1720,420,200))
+
     def test_story_waits_for_fresh_exact_label_after_animation(self):
         import re
         label={'text':'STORYI','box':[184,1410,147,34]}
@@ -21,10 +32,10 @@ class EventDailyTests(unittest.TestCase):
                 self.assertIsNone(re.search(expression,'STORYII'))
                 frames['ready']=True
         v=SimpleNamespace(options={},scan=Mock(),find=find,expect=Mock(side_effect=expect),
-                          click_text=Mock(),e=SimpleNamespace(log=Mock()))
+                          click_text=Mock(),wait=Mock(),e=SimpleNamespace(log=Mock()))
         flow=EventActivities(v);flow.home=Mock();flow.enabled=Mock(return_value=True);flow.select_stage=Mock(return_value=True);flow.used_tickets=Mock(return_value=True)
         flow.story()
-        v.expect.assert_any_call(r'^STORY\s*I$',(0,1300,500,400),timeout=15)
+        v.expect.assert_any_call(r'^STORY\s*I$',(0,1300,500,400),timeout=35)
         v.click_text.assert_called_once_with(r'^STORY\s*I$',(0,1300,500,400))
 
     def test_open_story_two_pushes_before_configured_farming(self):
@@ -40,6 +51,15 @@ class EventDailyTests(unittest.TestCase):
             push.return_value.run.assert_called_once()
         flow.open_story_part.assert_called_once_with('II')
         flow.select_stage.assert_called_once_with()
+
+    def test_observed_story_two_entry_is_not_discarded_by_another_scan(self):
+        label={'text':'STORY II','box':[150,1516,143,38]}
+        v=SimpleNamespace(find=Mock(side_effect=[label,None,None,None]),
+            expect=Mock(),click_text=Mock(),e=SimpleNamespace(log=Mock()))
+        flow=EventActivities(v);flow.enabled=Mock(return_value=True)
+        self.assertTrue(flow.open_story_part('II'))
+        v.click_text.assert_called_once_with(r'^STORY\s*II$',(0,1300,500,400))
+        self.assertFalse(any(c.args[0]==r'^STORY\s*II$' for c in v.expect.call_args_list))
 
     def test_story_two_without_tickets_never_starts_or_farms(self):
         label={'text':'STORY II','box':[100,1500,200,40]}

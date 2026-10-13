@@ -24,6 +24,14 @@ class PopupCloseTests(unittest.TestCase):
         d=self.make_daily();d.items=[{'text':'关闭','box':[880,300,60,30]}]
         self.assertEqual(d.generic_popup_close(),(910,315))
 
+    def test_tower_closed_status_is_not_a_popup_button(self):
+        d=self.make_daily()
+        d.items=[{'text':'无限之塔','box':[20,50,180,40]},
+                 {'text':'关闭','box':[370,1040,100,40]},
+                 {'text':'目前无法进入','box':[340,1630,180,40]}]
+        self.assertIsNone(d.generic_popup_close())
+        self.assertIsNone(d.generic_popup_close(dismiss_navigation=True))
+
     def test_white_x_on_blue_header_and_plain_background_rejection(self):
         d=self.make_daily();d.image=Image.new('RGB',(1080,1920),'black')
         draw=ImageDraw.Draw(d.image);draw.rectangle((100,300,1020,400),fill=(0,150,245))
@@ -44,6 +52,11 @@ class PopupCloseTests(unittest.TestCase):
         d.image=Image.new('RGB',(1080,1920),'black');d.close_cross=Mock()
         self.assertIsNone(d.generic_popup_close());d.close_cross.assert_not_called()
 
+    def test_stage_sheet_stays_open_for_battle_handler(self):
+        d=self.make_daily();d.items=[{'text':'关卡信息','box':[430,640,150,50]}]
+        d.image=Image.new('RGB',(1080,1920),'black');d.close_cross=Mock()
+        self.assertIsNone(d.generic_popup_close());d.close_cross.assert_not_called()
+
     def test_startup_closes_pass_panel_with_non_blue_x(self):
         d=self.make_daily();d.items=[{'text':'任务','box':[700,600,100,50]}]
         d.image=Image.new('RGB',(1080,1920),'black')
@@ -52,6 +65,11 @@ class PopupCloseTests(unittest.TestCase):
         draw.line((960,148,992,116),fill='white',width=3)
         self.assertIsNone(d.generic_popup_close())
         self.assertIsNotNone(d.generic_popup_close(dismiss_navigation=True))
+        d.items.append({'text':'购买PASS','box':[740,480,210,60]})
+        d.active_handler='rookie'
+        self.assertIsNotNone(d.generic_popup_close())
+        d.active_handler='missions'
+        self.assertIsNone(d.generic_popup_close())
 
     def test_native_flow_returns_to_interrupted_node(self):
         graph=with_common_popups({'Entry':{'next':['Claim']},'Claim':{'next':['Done']},'Done':{}})
