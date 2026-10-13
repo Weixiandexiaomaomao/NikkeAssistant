@@ -213,7 +213,10 @@ class Daily:
     def maintenance_close(self):
         title=self.find('^公告$',(380,300,400,300))
         if not (title and self.find('亲爱的指挥官',(80,450,700,220))
-                and self.find('一周内不再显示',(80,1380,850,200))):
+                # The checkbox caption may lose its leading character in OCR.
+                # The blue title, greeting and visible cross already identify
+                # this informational announcement, including during loading.
+                ):
             return None
         y=round(title['box'][1]+title['box'][3]/2)
         if not self.blue(800,y):return None

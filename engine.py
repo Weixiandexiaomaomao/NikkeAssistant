@@ -140,14 +140,38 @@ class Engine:
                         if re.fullmatch(r'com\.tencent\.nikke/[A-Za-z0-9_.$]+',line.strip())),None)
         if not component:raise RuntimeError('所选模拟器未找到国服游戏启动入口，请检查是否已安装')
         self.log('已定位游戏启动入口：'+component)
-        result=adb_run(self.adb,self.serial,'shell','am','start','-n',component).decode('utf-8',errors='replace')
-        if re.search(r'Error:|Exception|Permission Denial',result):
-            raise RuntimeError('游戏启动失败：'+result.strip())
-        vision=None;deadline=time.monotonic()+240;title_clicks=0;last_title=0
+        # Match an Android launcher tap, including its MAIN/category/task flags.
+        def launch():
+            result=adb_run(self.adb,self.serial,'shell','am','start',
+                       '-a','android.intent.action.MAIN',
+                           '-c','android.intent.category.LAUNCHER',
+                           '-f','0x10200000','-n',component).decode('utf-8',errors='replace')
+            if re.search(r'Error:|Exception|Permission Denial',result):
+                raise RuntimeError('游戏启动失败：'+result.strip())
+        launch()
+        vision=None;deadline=time.monotonic()+360;title_clicks=0;last_title=0
+        last_progress=time.monotonic()
+        blank_since=None;launch_retries=0
         while time.monotonic()<deadline:
             if self.stop_event.wait(1):raise InterruptedError('用户停止')
+            if time.monotonic()-last_progress>=30:
+                self.log('游戏正在启动，继续等待加载并检查公告弹窗')
+                last_progress=time.monotonic()
             image=Image.open(io.BytesIO(self.screenshot()))
             if abs(image.width/image.height-9/16)>.01:continue
+            # Android splash screens can stall after a cold emulator boot.
+            # Only retry a nearly black screen, never a loading or login page.
+            samples=list(image.convert('RGB').resize((54,96)).getdata())
+            blank=sum(max(pixel)<25 for pixel in samples)/len(samples)>.97
+            if blank:
+                if blank_since is None:blank_since=time.monotonic()
+                if time.monotonic()-blank_since>=60 and launch_retries<2:
+                    self.log('游戏持续黑屏，自动重新启动游戏')
+                    adb_run(self.adb,self.serial,'shell','am','force-stop',package)
+                    if self.stop_event.wait(2):raise InterruptedError('用户停止')
+                    launch();launch_retries+=1;blank_since=None
+                continue
+            blank_since=None
             if vision is None:vision=Daily(self)
             vision.scan()
             maintenance=vision.maintenance_close()
@@ -169,7 +193,7 @@ class Engine:
                     self.log('启动游戏已确认进入大厅');return
             if vision.find('QQ登录|微信登录|输入.*验证码|手机.*登录'):
                 raise RuntimeError('游戏需要登录，请完成账号登录后重新运行启动任务')
-        raise RuntimeError('启动游戏等待大厅超过四分钟，请检查加载或登录画面')
+        raise RuntimeError('启动游戏等待大厅超过六分钟，请检查加载或登录画面')
 
     def run(self, tasks):
         if not self.controller:
