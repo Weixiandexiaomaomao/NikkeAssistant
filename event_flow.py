@@ -560,6 +560,18 @@ class EventPush:
         start = '^(?:战斗开始|进入战斗|开始战斗)$'
         next_stage = '^下一关(?:卡)?$'
         if not (v.find(next_stage) or (stage and v.find(start))):
+            lobby=v.find('^大厅$',(450,1820,180,100)) and v.lobby()
+            activity=v.find('活动地区',(0,0,300,180)) and v.find('STORY',(0,1300,500,400))
+            if lobby or activity:
+                v.e.log('从活动首页自动检查新关卡，优先 STORY II')
+                saved_options=v.options
+                v.options={**saved_options,'event_story_mode':'推图'}
+                try:
+                    EventActivities(v).story()
+                    v.home()
+                finally:
+                    v.options=saved_options
+                return
             raise RuntimeError('请先进入活动并选择关卡，停在战斗准备页或战后“下一关卡”页。活动地图自动选关尚未适配。')
         started = 0
         in_battle = False

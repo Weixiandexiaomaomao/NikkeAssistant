@@ -202,11 +202,11 @@
   },
   {
     "id": "event_continue",
-    "name": "活动推图 · 从当前关卡继续",
+    "name": "活动推图 · 新关卡优先",
     "handler": "event_push",
-    "status": "待国服实测",
+    "status": "大厅选关和票数检查已实测，首次战斗待验证",
     "default": false,
-    "description": "手动进入任一活动并选择首关，从准备页或战后下一关页面开始。连续开战、战后下一关、可选跳过剧情；失败、锁定、门票不足停止。大厅入口和活动地图自动选关尚未适配。",
+    "description": "从大厅自动进入已适配的 UNBREAKABLE SPHERE 活动，优先检查已开放的 STORY II 未通关关卡；没有新关卡时再检查 STORY I。从已选关的准备页或战后下一关页启动时继续当前关卡。只用现有门票，不购买次数；剧情跳过沿用活动设置。",
     "package": "com.tencent.nikke",
     "aspect": 0.5625
   },
