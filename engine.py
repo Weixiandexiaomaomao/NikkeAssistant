@@ -173,7 +173,7 @@ class Engine:
                 continue
             blank_since=None
             if vision is None:vision=Daily(self)
-            vision.scan()
+            vision.scan(dismiss_navigation=True)
             maintenance=vision.maintenance_close()
             if maintenance:
                 self.log('关闭启动维护公告');vision.tap(*maintenance,delay=2);continue

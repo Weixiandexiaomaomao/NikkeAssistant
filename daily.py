@@ -28,11 +28,19 @@ class Daily:
         if self.e.stop_event.wait(seconds):
             raise InterruptedError('用户停止')
 
-    def scan(self):
+    def scan(self, dismiss_navigation=False):
         self.reward_dismissed = False
         self.acquire_dismissed = False
+        previous_close=None
         for attempt in range(7):
             self.scan_raw()
+            closing=self.find('关闭窗口后.*商品.*移至.*礼包商店',(80,700,950,400))
+            confirm=self.find('^确认$',(550,1050,480,400)) if closing else None
+            if confirm:
+                if attempt==6:raise RuntimeError('礼包关闭确认未消失')
+                self.e.log('确认关闭礼包展示，继续当前任务')
+                x,y,w,h=confirm['box'];self.tap_popup(x+w/2,y+h/2,delay=2)
+                continue
             close=self.announcement_close() or self.maintenance_close() or self.notification_close()
             if close:
                 if attempt==6:raise RuntimeError('弹窗关闭后仍反复出现，未继续点击')
@@ -43,7 +51,19 @@ class Daily:
             if promotion:
                 if attempt==6:raise RuntimeError('礼包推销弹窗关闭重试已达上限')
                 self.e.log('统一关闭礼包推销弹窗，继续当前任务')
-                x,y,w,h=promotion['box'];self.tap(x+w/2,y+h/2,delay=2)
+                if previous_close==promotion['text'] and getattr(self.e,'adb',None):
+                    from engine import adb_run
+                    self.e.log('关闭文字点击未生效，使用返回键关闭弹窗')
+                    adb_run(self.e.adb,self.e.serial,'shell','input','keyevent','4');self.wait(2)
+                else:
+                    x,y,w,h=promotion['box'];self.tap_popup(x+w/2,y+h/2,delay=2)
+                previous_close=promotion['text']
+                continue
+            generic_close=self.generic_popup_close(dismiss_navigation=dismiss_navigation)
+            if generic_close:
+                if attempt==6:raise RuntimeError('关闭按钮点击后弹窗仍未消失')
+                self.e.log('统一点击弹窗关闭按钮，继续当前任务')
+                self.tap_popup(*generic_close,delay=2)
                 continue
             reveal_skip=self.find(r'^(?:[>》»\s]*)(?:跳过|SKIP)$',(800,0,280,160))
             reveal=(reveal_skip and self.find(r'^(?:TETRA|ELYSION|MISSILIS|PILGRIM|ABNORMAL)$',(0,0,650,400))
@@ -103,9 +123,53 @@ class Daily:
         return prompt
 
     def promotion_close(self):
-        close=self.find(r'^点击(?:.*)关闭(?:画面|页面)?[。.]?$',(150,1650,850,250))
-        offer=self.find('礼包.*购买|礼包中.*选择',(0,750,1080,420))
-        return close if close and offer else None
+        # The dismiss instruction is sufficient; offer wording changes and
+        # OCR can split it over several lines.
+        if self.find('^取消$') or self.find('^确认$'):return None
+        return self.find(r'^\s*点击\s*(?:任意处\s*)?关闭\s*(?:画面|页面)?\s*[。.]?\s*$',
+                         (100,1500,900,400))
+
+    def tap_popup(self,x,y,delay=2):
+        # Use the raw Android screenshot coordinates. The controller may still
+        # retain a scale from before an activity changed the display size.
+        if not hasattr(self,'size') or not getattr(self.e,'adb',None):
+            return self.tap(x,y,delay=delay)
+        from engine import adb_run
+        w,h=self.size
+        adb_run(self.e.adb,self.e.serial,'shell','input','tap',
+                str(round(x*w/1080)),str(round(y*h/1920)))
+        self.wait(delay)
+
+    def generic_popup_close(self, dismiss_navigation=False):
+        """Close text/X; startup and home may also dismiss open task panels."""
+        if (self.find('^取消$') or self.find('A型物资.*批量获取已结束')
+                or self.find('是否更新商品|重置购买次数|消耗资金')):return None
+        text=self.find(r'^\s*(?:[×✕✖]\s*)?关闭\s*$',(60,100,970,1800))
+        if text:
+            x,y,w,h=text['box'];return x+w/2,y+h/2
+        # These windows are task destinations, even though they also have X.
+        if not dismiss_navigation and self.find(r'^(?:邮箱|好友|防御前哨基地|派遣|咨询|普通商店|付费商店|任务|通行证)$',
+                     (100,90,900,500)):return None
+        if not hasattr(self,'image'):return None
+        # Search connected white strokes in the upper-right dialog area.
+        # Require an X shape and a blue header rather than guessing a point.
+        mask=np.min(np.asarray(self.image.crop((820,90,1040,1000))),axis=2)>215
+        visited=np.zeros(mask.shape,dtype=bool)
+        for y,x in zip(*np.where(mask)):
+            if visited[y,x]:continue
+            stack=[(y,x)];visited[y,x]=True;points=[]
+            while stack:
+                py,px=stack.pop();points.append((py,px))
+                for ny,nx in ((py-1,px),(py+1,px),(py,px-1),(py,px+1)):
+                    if 0<=ny<mask.shape[0] and 0<=nx<mask.shape[1] and mask[ny,nx] and not visited[ny,nx]:
+                        visited[ny,nx]=True;stack.append((ny,nx))
+            ys,xs=zip(*points);w=max(xs)-min(xs)+1;h=max(ys)-min(ys)+1
+            if not (24<=w<=65 and 24<=h<=65 and .8<=w/h<=1.25):continue
+            cx=820+(min(xs)+max(xs))/2;cy=90+(min(ys)+max(ys))/2
+            if dismiss_navigation or self.blue(cx-95,cy):
+                hit=self.close_cross(range(round(cx)-2,round(cx)+3),range(round(cy)-2,round(cy)+3))
+                if hit:return hit
+        return None
 
     def scan_raw(self):
         self.wait(.05)
@@ -296,7 +360,7 @@ class Daily:
         for _ in range(24):
             if time.monotonic()>=deadline:
                 raise RuntimeError('登录弹窗处理超时，请手动检查')
-            self.scan()
+            self.scan(dismiss_navigation=True)
             close = self.announcement_close()
             key = '公告'
             action = None
