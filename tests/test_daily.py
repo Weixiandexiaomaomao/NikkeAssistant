@@ -197,7 +197,7 @@ class DailyChecks(unittest.TestCase):
         d.scan=lambda:setattr(d,'items',next(frames))
         d.click_text=Mock(side_effect=[False,False,True,False])
         self.assertTrue(d.battle('新人竞技场',allow_defeat=True))
-        d.e.log.assert_called_once_with('竞技场本场落败，等待结算后继续剩余免费挑战')
+        d.e.log.assert_called_once_with('竞技场出现落败回合，等待完整结算后继续剩余免费挑战')
     def test_rookie_waits_for_all_three_opponents_after_result_transition(self):
         d=Daily.__new__(Daily);d.reward_generation=0;d.wait=Mock();d.find=Mock(return_value=True)
         buttons=[{'text':'进入战斗','box':[780,y,190,60]} for y in (1040,1320,1590)]
