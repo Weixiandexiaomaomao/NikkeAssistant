@@ -79,7 +79,7 @@ class DailyChecks(unittest.TestCase):
         from engine import Engine
         frames=[]
         for size in ((1280,720),(720,1280)):
-            b=io.BytesIO();Image.new('RGB',size).save(b,format='PNG');frames.append(b.getvalue())
+            b=io.BytesIO();Image.new('RGB',size,'white').save(b,format='PNG');frames.append(b.getvalue())
         e=Engine(Mock());e.adb='adb';e.serial='chosen';e.stop_event=Mock()
         e.stop_event.wait.return_value=False;e.screenshot=Mock(side_effect=frames)
         with patch('engine.adb_run',side_effect=[b'com.tencent.nikke/.default_Activity',b'Starting: Intent']),patch('daily.Daily') as daily:
