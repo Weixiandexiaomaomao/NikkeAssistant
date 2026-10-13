@@ -144,13 +144,28 @@ class Daily:
         """Close text/X; startup and home may also dismiss open task panels."""
         if (self.find('^取消$') or self.find('A型物资.*批量获取已结束')
                 or self.find('是否更新商品|重置购买次数|消耗资金')):return None
-        text=self.find(r'^\s*(?:[×✕✖]\s*)?关闭\s*$',(60,100,970,1800))
+        # Tower cards use "关闭" as an availability label, not a control.
+        tower_status=(self.find('^无限之塔$',(0,0,300,160))
+                      and self.find('(?:当前|目前)无法进入',(0,1400,1080,350)))
+        text=None if tower_status else self.find(r'^\s*(?:[×✕✖]\s*)?关闭\s*$',(60,100,970,1800))
         if text:
             x,y,w,h=text['box'];return x+w/2,y+h/2
         # These windows are task destinations, even though they also have X.
-        if not dismiss_navigation and self.find(r'^(?:邮箱|好友|防御前哨基地|派遣|咨询|普通商店|付费商店|任务|通行证)$',
+        if not dismiss_navigation and getattr(self,'active_handler',None)=='missions':
+            return None
+        if not dismiss_navigation and self.find('关卡信息'):
+            return None
+        if not dismiss_navigation and self.find('^(?:活动关卡|新人竞技场|无限之塔|方舟)$',(0,0,350,170)):
+            return None
+        pass_ad=(getattr(self,'active_handler',None)!='missions'
+                 and self.find('MISSION.*PASS|购买PASS',(300,100,740,550)))
+        if not dismiss_navigation and not pass_ad and self.find(r'^(?:邮箱|好友|防御前哨基地|派遣|咨询|普通商店|付费商店|任务|通行证)$',
                      (100,90,900,500)):return None
         if not hasattr(self,'image'):return None
+        if self.find('^大厅$',(450,1820,180,100)):
+            nav=np.asarray(self.image.crop((480,1838,596,1890)))
+            if np.mean(np.min(nav,axis=2)>190)>.025:
+                return None
         # Search connected white strokes in the upper-right dialog area.
         # Require an X shape and a blue header rather than guessing a point.
         mask=np.min(np.asarray(self.image.crop((820,90,1040,1000))),axis=2)>215
@@ -166,7 +181,7 @@ class Daily:
             ys,xs=zip(*points);w=max(xs)-min(xs)+1;h=max(ys)-min(ys)+1
             if not (24<=w<=65 and 24<=h<=65 and .8<=w/h<=1.25):continue
             cx=820+(min(xs)+max(xs))/2;cy=90+(min(ys)+max(ys))/2
-            if dismiss_navigation or self.blue(cx-95,cy):
+            if dismiss_navigation or pass_ad or self.blue(cx-95,cy):
                 hit=self.close_cross(range(round(cx)-2,round(cx)+3),range(round(cy)-2,round(cy)+3))
                 if hit:return hit
         return None
@@ -537,6 +552,7 @@ class Daily:
         self.expect(page, (0, 0, 300, 150))
 
     def run(self, kind):
+        self.active_handler=kind
         if kind == 'event_supplies':
             from supplies_flow import Supplies
             return Supplies(self).run()

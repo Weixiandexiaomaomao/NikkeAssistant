@@ -165,6 +165,14 @@ class EventActivities:
         previous=None
         for _ in range(10):
             v.scan()
+            if v.find('LOADING', (250,700,600,450)):
+                v.wait(3)
+                previous=None
+                continue
+            # Story-only nodes may play immediately on selection, returning
+            # a result page rather than a battle preparation sheet.
+            if v.find('^下一关(?:卡)?$') and v.find('点击任意处进行下一步'):
+                return True
             fingerprint=np.asarray(v.image.crop((400,260,1030,1670)).resize((64,64)),dtype=float)
             if previous is not None and np.mean(np.abs(fingerprint-previous))<1.5:
                 return False
@@ -266,8 +274,14 @@ class EventActivities:
                 v.wait(2);v.scan()
         else:
             # Prefer newly opened STORY II before consuming tickets on old farming.
-            second=v.find(r'^STORY\s*II$',(0,1300,500,400))
+            second=None
+            for _ in range(10):
+                v.scan()
+                second=v.find(r'^STORY\s*II$',(0,1300,500,400))
+                if second:break
+                v.wait(1.5)
             if second and self.enabled(second):
+                v.e.log('优先检查已开放的 STORY II 新关卡')
                 self.open_story_part('II')
                 v.scan()
                 if v.find(r'[0OoＯ]\s*[/／]\s*5',(700,90,380,180)):
@@ -320,8 +334,10 @@ class EventActivities:
     def open_story_part(self, part):
         v=self.v
         expression=r'^STORY\s*'+part+r'$'
-        v.expect(expression,(0,1300,500,400),timeout=15)
         item=v.find(expression,(0,1300,500,400))
+        if not item:
+            v.expect(expression,(0,1300,500,400),timeout=35)
+            item=v.find(expression,(0,1300,500,400))
         if not item:raise RuntimeError('未识别 STORY '+part)
         if not self.enabled(item):
             v.e.log('STORY '+part+' 尚未开放，跳过')
@@ -333,6 +349,13 @@ class EventActivities:
                 raise RuntimeError('未确认 STORY 剧情活动入口页')
             v.click_text('^(?:ENTER|Enter|nter)$',(100,1250,800,400))
             v.expect('活动关卡',(0,0,300,170))
+        # The game remembers Hard even while its rows remain locked. Use
+        # the available Normal tab for daily ticket spending in that case.
+        normal=r'(?i)^(?:normal|orumal)$'
+        if v.find(r'Access\s*Denied') and v.find(normal,(350,1720,420,200)):
+            v.e.log('当前困难关卡未开放，切换普通关卡完成每日门票')
+            v.click_text(normal,(350,1720,420,200))
+            v.wait(2);v.scan()
         return True
 
     def challenge_remaining(self):
